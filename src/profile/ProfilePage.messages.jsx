@@ -20,6 +20,7 @@ const messages = defineMessages({
     id: 'profile.username.tooltip',
     defaultMessage: 'The name that identifies you on edX. You cannot change your username.',
     description: 'Tooltip for the username field.',
+  },
   'profile.completion.title': {
     id: 'profile.completion.title',
     defaultMessage: 'Profile Completion',
