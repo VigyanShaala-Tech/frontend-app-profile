@@ -359,7 +359,7 @@ const GenericSection = ({ config }) => {
                 <span key={val} className="badge bg-primary text-white d-flex align-items-center m-1">
                   {val}
                   <Button variant="white" size="sm" className="p-0 ms-1 text-white m-1" onClick={() => removeMulti(field.name, val)}>
-                    <FontAwesomeIcon icon={faClose} className="text-dark" />
+                    <FontAwesomeIcon icon={faClose} className="text-white" />
                   </Button>
                 </span>
               ))}
