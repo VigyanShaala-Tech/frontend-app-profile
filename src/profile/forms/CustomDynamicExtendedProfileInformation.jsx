@@ -21,7 +21,9 @@ import { useIntl } from '@edx/frontend-platform/i18n';
 
 const CustomExtendedProfileInformation = () => {
   const { formatMessage } = useIntl();
+
   const [sections, setSections] = useState([]);
+  const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
     const { LMS_BASE_URL } = getConfig();
@@ -29,16 +31,35 @@ const CustomExtendedProfileInformation = () => {
     const fetchSections = async () => {
       try {
         const client = getAuthenticatedHttpClient();
-        const { data } = await client.get(`${LMS_BASE_URL}/profile/dynamic-form/`);
-        setSections(Array.isArray(data) ? data : []);
+        const response = await client.get(
+          `${LMS_BASE_URL}/profile/dynamic-form/`
+        );
+
+        const result = response.data;
+
+        // hidden flag
+        if (result.hidden) {
+          setHidden(true);
+          setSections([]);
+        } else {
+          setHidden(false);
+          setSections(Array.isArray(result.data) ? result.data : []);
+        }
+
       } catch (err) {
         console.error('Failed to load dynamic form:', err);
+        setHidden(true);
         setSections([]);
       }
     };
 
     fetchSections();
   }, []);
+
+  // Completely hide section
+  if (hidden) {
+    return null;
+  }
 
   return (
     <div className="container-fluid mt-4 mb-4 p-4 extended-profile-information">
@@ -74,8 +95,15 @@ const GenericSection = ({ config }) => {
     const loadSavedData = async () => {
       try {
         const client = getAuthenticatedHttpClient();
-        const { data } = await client.get(`${LMS_BASE_URL}${config.getApi}`);
-        setSavedData(Object.keys(data || {}).length ? data : null);
+        const response = await client.get(`${LMS_BASE_URL}${config.getApi}`);
+        const result = response.data;
+
+        if (result.hidden) {
+          setSavedData(null);
+        } else {
+          const sectionData = result.data || {};
+          setSavedData(Object.keys(sectionData).length ? sectionData : null);
+        }
       } catch (err) {
         console.error(`Failed to load ${config.getApi}:`, err);
         setSavedData(null);
