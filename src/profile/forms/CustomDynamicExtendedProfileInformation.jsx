@@ -22,6 +22,7 @@ import { useIntl } from '@edx/frontend-platform/i18n';
 const CustomExtendedProfileInformation = () => {
   const { formatMessage } = useIntl();
   const [sections, setSections] = useState([]);
+  const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     const { LMS_BASE_URL } = getConfig();
@@ -30,7 +31,8 @@ const CustomExtendedProfileInformation = () => {
       try {
         const client = getAuthenticatedHttpClient();
         const { data } = await client.get(`${LMS_BASE_URL}/profile/dynamic-form/`);
-        setSections(Array.isArray(data) ? data : []);
+        setSections(Array.isArray(data.data) ? data.data : []);
+        setHidden(data.hidden);
       } catch (err) {
         console.error('Failed to load dynamic form:', err);
         setSections([]);
@@ -39,6 +41,10 @@ const CustomExtendedProfileInformation = () => {
 
     fetchSections();
   }, []);
+  
+  if (hidden) {
+    return null;
+  }
 
   return (
     <div className="container-fluid mt-4 mb-4 p-4 extended-profile-information">

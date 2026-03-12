@@ -45,6 +45,10 @@ const CustomProfileCompletion = () => {
     return () => unsubscribe();
   }, []);
 
+  if (progressData?.hidden) {
+    return null;
+  }
+  
   return (
     <div className="profile-completion-container">
       <h2 className='container-header'>{formatMessage(messages['profile.completion.title'])}</h2>
