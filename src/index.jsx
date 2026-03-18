@@ -26,7 +26,6 @@ import configureStore from './data/configureStore';
 import Head from './head/Head';
 
 import AppRoutes from './routes/AppRoutes';
-import { PluginSlot } from '@openedx/frontend-plugin-framework';
 
 import './index.scss';
 
@@ -35,16 +34,7 @@ subscribe(APP_READY, async () => {
   rootNode.render(
     <AppProvider store={configureStore()}>
       <Head />
-      <PluginSlot
-        id="org.openedx.frontend.layout.header_profile.v1"
-        idAliases={['header_slot']}
-        slotOptions={{
-          mergeProps: true,
-        }}
-        pluginProps={{}}
-      >
-        <Header />
-      </PluginSlot>
+      <Header />
       <main id="main">
         <AppRoutes />
       </main>
