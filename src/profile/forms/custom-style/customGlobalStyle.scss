@@ -1,0 +1,77 @@
+.custom-profile-root {
+  --primary: #69ab4a;
+  --primary-rgb: 105, 171, 74;
+  --primary-dark: #5e9b42;
+  --primary-soft: rgba(var(--primary-rgb), 0.12);
+  --pgn-color-primary-base: #69ab4a;
+  --pgn-color-form-input-focus-base: #69ab4a;
+  --pgn-elevation-form-input-focus: 0 0 0 0.2rem rgba(105, 171, 74, 0.25);
+}
+
+.custom-profile-root .text-primary,
+.custom-profile-root .text-primary-500 {
+  color: var(--primary) !important;
+}
+
+.custom-profile-root .bg-primary,
+.custom-profile-root .progress-bar.bg-primary {
+  background-color: var(--primary) !important;
+}
+
+.custom-profile-root .border-primary {
+  border-color: var(--primary) !important;
+}
+
+.custom-profile-root .btn-primary,
+.custom-profile-root .pgn__stateful-btn.btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.custom-profile-root .btn-primary:hover,
+.custom-profile-root .btn-primary:focus,
+.custom-profile-root .pgn__stateful-btn.btn-primary:hover,
+.custom-profile-root .pgn__stateful-btn.btn-primary:focus {
+  background-color: var(--primary-dark) !important;
+  border-color: var(--primary-dark) !important;
+}
+
+.custom-profile-root .btn-outline-primary {
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+.custom-profile-root .btn-outline-primary:hover,
+.custom-profile-root .btn-outline-primary:focus {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.custom-profile-soft-card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+.custom-profile-section-title {
+  color: #111827;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  margin: 0;
+}
+
+.custom-profile-section-description {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 20px;
+  margin: 0;
+}
+
+.custom-profile-btn-outline {
+  border: 1px solid #d1d5db !important;
+  color: var(--primary) !important;
+}
