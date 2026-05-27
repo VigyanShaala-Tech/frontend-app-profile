@@ -1,5 +1,5 @@
 import React, {
-  useEffect, useState, useContext, useCallback,
+  useEffect, useContext, useCallback,
 } from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
@@ -9,10 +9,7 @@ import { sendTrackingLogEvent } from '@edx/frontend-platform/analytics';
 import { ensureConfig } from '@edx/frontend-platform';
 import { AppContext } from '@edx/frontend-platform/react';
 import { FormattedMessage, useIntl } from '@edx/frontend-platform/i18n';
-import {
-  Alert, Hyperlink, OverlayTrigger, Tooltip,
-} from '@openedx/paragon';
-import { InfoOutline } from '@openedx/paragon/icons';
+import { Alert } from '@openedx/paragon';
 import classNames from 'classnames';
 
 import {
@@ -25,25 +22,25 @@ import {
   updateDraft,
 } from './data/actions';
 
-import ProfileAvatar from './forms/ProfileAvatar';
+import CustomProfileAvatar from './forms/custom-profile-fields/CustomProfileAvatar';
 import Name from './forms/Name';
-import Country from './forms/Country';
+// import CustomGender from './forms/custom-profile-fields/CustomGender';
+import CustomCountry from './forms/custom-profile-fields/CustomCountry';
 import PreferredLanguage from './forms/PreferredLanguage';
 import Education from './forms/Education';
-import SocialLinks from './forms/SocialLinks';
-import Bio from './forms/Bio';
-import DateJoined from './DateJoined';
-import UserCertificateSummary from './UserCertificateSummary';
+import CustomSocialLinks from './forms/custom-profile-fields/CustomSocialLinks';
+import CustomBio from './forms/custom-profile-fields/CustomBio';
 import PageLoading from './PageLoading';
 import Certificates from './Certificates';
-
 import CustomProfileCompletion from './forms/CustomProfileCompletion';
-// import CustomExtendedProfileInformation from './forms/CustomExtendedProfileInformation';
 import CustomExtendedProfileInformation from './forms/CustomDynamicExtendedProfileInformation';
 import { profilePageSelector } from './data/selectors';
 import messages from './ProfilePage.messages';
+import customMessages from './CustomProfilePage.messages';
 import withParams from '../utils/hoc';
-import { useIsOnMobileScreen, useIsOnTabletScreen } from './data/hooks';
+import { useIsOnMobileScreen } from './data/hooks';
+import './forms/custom-style/customProfilePage.scss';
+import './forms/custom-style/customGlobalStyle.scss';
 
 import AdditionalProfileFieldsSlot from '../plugin-slots/AdditionalProfileFieldsSlot';
 
@@ -66,6 +63,8 @@ const ProfilePage = ({ params }) => {
     visibilityCountry,
     levelOfEducation,
     visibilityLevelOfEducation,
+    gender,
+    visibilityGender,
     socialLinks,
     draftSocialLinksByPlatform,
     visibilitySocialLinks,
@@ -78,21 +77,14 @@ const ProfilePage = ({ params }) => {
   } = useSelector(profilePageSelector);
 
   const navigate = useNavigate();
-  const [viewMyRecordsUrl, setViewMyRecordsUrl] = useState(null);
   const isMobileView = useIsOnMobileScreen();
-  const isTabletView = useIsOnTabletScreen();
 
   useEffect(() => {
-    const { CREDENTIALS_BASE_URL } = context.config;
-    if (CREDENTIALS_BASE_URL) {
-      setViewMyRecordsUrl(`${CREDENTIALS_BASE_URL}/records`);
-    }
-
     dispatch(fetchProfile(params.username));
     sendTrackingLogEvent('edx.profile.viewed', {
       username: params.username,
     });
-  }, [dispatch, params.username, context.config]);
+  }, [dispatch, params.username]);
 
   useEffect(() => {
     if (!username && saveState === 'error' && navigate) {
@@ -127,29 +119,16 @@ const ProfilePage = ({ params }) => {
   }, [dispatch]);
 
   const isAuthenticatedUserProfile = () => params.username === authenticatedUserName;
-
   const isBlockVisible = (blockInfo) => isAuthenticatedUserProfile()
       || (!isAuthenticatedUserProfile() && Boolean(blockInfo));
 
-  const renderViewMyRecordsButton = () => {
-    if (!(viewMyRecordsUrl && isAuthenticatedUserProfile())) {
-      return null;
+  const joinedYear = (() => {
+    if (!dateJoined) {
+      return '-';
     }
-
-    return (
-      <Hyperlink
-        className={classNames(
-          'btn btn-brand bg-brand-500 font-weight-normal px-4 py-10px text-nowrap',
-          { 'w-100': isMobileView },
-        )}
-        target="_blank"
-        showLaunchIcon={false}
-        destination={viewMyRecordsUrl}
-      >
-        {intl.formatMessage(messages['profile.viewMyRecords'])}
-      </Hyperlink>
-    );
-  };
+    const parsedDate = new Date(dateJoined);
+    return Number.isNaN(parsedDate.getTime()) ? '-' : parsedDate.getFullYear().toString();
+  })();
 
   const renderPhotoUploadErrorMessage = () => (
     photoUploadError && (
@@ -171,233 +150,177 @@ const ProfilePage = ({ params }) => {
   };
 
   return (
-    <div className="profile-page">
+    <div className="profile-page custom-profile-root">
       {isLoadingProfile ? (
         <PageLoading srMessage={intl.formatMessage(messages['profile.loading'])} />
       ) : (
         <>
-          <div
-            className={classNames(
-              'profile-page-bg-banner bg-primary d-md-block align-items-center h-100 w-100',
-              { 'px-3 py-4': isMobileView },
-              { 'px-120px py-5.5': !isMobileView },
-            )}
-          >
-            <div
-              className={classNames([
-                'col container-fluid w-100 h-100 bg-white py-0 rounded-75',
-                {
-                  'px-3': isMobileView,
-                  'px-40px': !isMobileView,
-                },
-              ])}
-            >
-              <div
-                className={classNames([
-                  'col h-100 w-100 px-0 justify-content-start g-15rem',
-                  {
-                    'py-4': isMobileView,
-                    'py-36px': !isMobileView,
-                  },
-                ])}
-              >
-                <div
-                  className={classNames([
-                    'row-auto d-flex flex-wrap align-items-center h-100 w-100 justify-content-start g-15rem',
-                    isMobileView || isTabletView ? 'flex-column' : 'flex-row',
-                  ])}
-                >
-                  <ProfileAvatar
-                    className="col p-0"
-                    src={profileImage.src}
-                    isDefault={profileImage.isDefault}
-                    onSave={handleSaveProfilePhoto}
-                    onDelete={handleDeleteProfilePhoto}
-                    savePhotoState={savePhotoState}
-                    isEditable={isAuthenticatedUserProfile()}
-                  />
-                  <div
-                    className={classNames([
-                      'col h-100 w-100 m-0 p-0',
-                      isMobileView || isTabletView
-                        ? 'd-flex flex-column justify-content-center align-items-center'
-                        : 'justify-content-start align-items-start',
-                    ])}
-                  >
-                    <p className="row m-0 font-weight-bold text-truncate text-primary-500 h3">
-                      {params.username}
-                    </p>
-                    {isBlockVisible(name) && (
-                    <p className="row pt-2 text-gray-800 font-weight-normal m-0 p">
-                      {name}
-                    </p>
-                    )}
-                    <div className={classNames(
-                      'row pt-2 m-0',
-                      isMobileView
-                        ? 'd-flex justify-content-center align-items-center flex-column'
-                        : 'g-1rem',
-                    )}
-                    >
-                      <DateJoined date={dateJoined} />
-                      <UserCertificateSummary count={courseCertificates?.length || 0} />
-                    </div>
-                  </div>
-                  <div className={classNames([
-                    'p-0 ',
-                    isMobileView || isTabletView ? 'col d-flex justify-content-center' : 'col-auto',
-                  ])}
-                  >
-                    {renderViewMyRecordsButton()}
-                  </div>
-                </div>
+          <div className="custom-profile-hero" />
+          <div className={classNames(['custom-profile-main'])}>
+            <div className="custom-profile-header-card">
+              <div className="custom-profile-header-avatar">
+                <CustomProfileAvatar
+                  className="w-100 h-100"
+                  src={profileImage.src}
+                  isDefault={profileImage.isDefault}
+                  onSave={handleSaveProfilePhoto}
+                  onDelete={handleDeleteProfilePhoto}
+                  savePhotoState={savePhotoState}
+                  isEditable={isAuthenticatedUserProfile()}
+                />
               </div>
-              <div className="ml-auto">
-                {renderPhotoUploadErrorMessage()}
+              <div className="custom-profile-header-text">
+                <p className="custom-profile-header-name">{name || params.username}</p>
+                <p className="custom-profile-header-subtext">
+                  <FormattedMessage
+                    id={customMessages['profile.custom.page.memberSince'].id}
+                    defaultMessage={customMessages['profile.custom.page.memberSince'].defaultMessage}
+                    values={{ year: joinedYear }}
+                  />
+                </p>
               </div>
             </div>
+            <div className="ml-auto">
+              {renderPhotoUploadErrorMessage()}
+            </div>
           </div>
-          <div
-            className={classNames([
-              'col d-inline-flex h-100 w-100 align-items-start justify-content-start g-3rem',
-              isMobileView ? 'py-4 px-3' : 'px-120px py-6',
-            ])}
-          >
-            <div className="w-100 p-0">
-              <div className="col justify-content-start align-items-start p-0">
-                <div className="col align-self-stretch height-42px justify-content-start align-items-start p-0">
-                  <p className="font-weight-bold text-primary-500 m-0 h2">
-                    {isMobileView ? (
+
+          <div className={classNames(['custom-profile-layout', isMobileView ? 'py-2' : 'py-4'])}>
+            <div className="custom-profile-top-title">
+              <p className="custom-profile-section-title">
+                <FormattedMessage
+                  id={customMessages['profile.custom.page.profileInformation'].id}
+                  defaultMessage={customMessages['profile.custom.page.profileInformation'].defaultMessage}
+                />
+              </p>
+              <p className="custom-profile-section-description">
+                <FormattedMessage
+                  id={customMessages['profile.custom.page.profileInformationDescription'].id}
+                  defaultMessage={customMessages['profile.custom.page.profileInformationDescription'].defaultMessage}
+                />
+              </p>
+            </div>
+
+            <div className="custom-profile-content-grid">
+              <div className="custom-profile-left-column">
+                {isBlockVisible(name) && (
+                  <div className="custom-profile-card">
+                    <Name
+                      name={name}
+                      accountSettingsUrl={context.config.ACCOUNT_SETTINGS_URL}
+                      visibilityName={visibilityName}
+                      formId="name"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+
+                {/* Gender field temporarily disabled due to backend issue. */}
+                {/*
+                {isBlockVisible(gender) && (
+                  <div className="custom-profile-card">
+                    <CustomGender
+                      gender={gender}
+                      visibilityGender={visibilityGender}
+                      formId="gender"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+                */}
+
+                {isBlockVisible(country) && (
+                  <div className="custom-profile-card">
+                    <CustomCountry
+                      country={country}
+                      visibilityCountry={visibilityCountry}
+                      formId="country"
+                      labelMessageId="profile.custom.location.label"
+                      defaultLabelMessage="Location"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+
+                {isBlockVisible((languageProficiencies || []).length) && (
+                  <div className="custom-profile-card">
+                    <PreferredLanguage
+                      languageProficiencies={languageProficiencies || []}
+                      visibilityLanguageProficiencies={visibilityLanguageProficiencies}
+                      formId="languageProficiencies"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+
+                {isBlockVisible(levelOfEducation) && (
+                  <div className="custom-profile-card">
+                    <Education
+                      levelOfEducation={levelOfEducation}
+                      visibilityLevelOfEducation={visibilityLevelOfEducation}
+                      formId="levelOfEducation"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+
+                {isBlockVisible(bio) && (
+                  <div className="custom-profile-card">
+                    <CustomBio
+                      bio={bio}
+                      visibilityBio={visibilityBio}
+                      formId="bio"
+                      titleMessageId="profile.custom.about.me"
+                      defaultTitleMessage="About Me"
+                      {...commonFormProps}
+                    />
+                  </div>
+                )}
+
+                <AdditionalProfileFieldsSlot />
+
+                {isBlockVisible((socialLinks || []).some((link) => link?.socialLink !== null)) && (
+                  <div className="custom-profile-card">
+                    <p className="h5 font-weight-bold m-0 pb-2">
                       <FormattedMessage
-                        id="profile.profile.information"
-                        defaultMessage="Profile"
-                        description="heading for the editable profile section in mobile view"
+                        id={customMessages['profile.custom.page.socialLinks'].id}
+                        defaultMessage={customMessages['profile.custom.page.socialLinks'].defaultMessage}
                       />
-                    )
-                      : (
-                        <FormattedMessage
-                          id="profile.profile.information"
-                          defaultMessage="Profile information"
-                          description="heading for the editable profile section"
-                        />
-                      )}
-                  </p>
-                </div>
-              </div>
-              <div
-                className={classNames([
-                  'row m-0 px-0 w-100 d-inline-flex align-items-start justify-content-start',
-                  isMobileView ? 'pt-4' : 'pt-5.5',
-                ])}
-              >
-                <div
-                  className={classNames([
-                    'col p-0',
-                    isMobileView ? 'col-12' : 'col-6',
-                  ])}
-                >
-                  <div className="m-0">
-                    <div className="row m-0 pb-1.5 align-items-center">
-                      <p data-hj-suppress className="h5 font-weight-bold m-0">
-                        {intl.formatMessage(messages['profile.username'])}
-                      </p>
-                      <OverlayTrigger
-                        key="top"
-                        placement="top"
-                        overlay={(
-                          <Tooltip variant="light" id="tooltip-top">
-                            <p className="h5 font-weight-normal m-0 p-0">
-                              {intl.formatMessage(messages['profile.username.tooltip'])}
-                            </p>
-                          </Tooltip>
-                          )}
-                      >
-                        <InfoOutline className="m-0 info-icon" />
-                      </OverlayTrigger>
-                    </div>
-                    <h4 className="edit-section-header text-gray-700">
-                      {params.username}
-                    </h4>
+                    </p>
+                    <CustomSocialLinks
+                      socialLinks={socialLinks || []}
+                      draftSocialLinksByPlatform={draftSocialLinksByPlatform || {}}
+                      visibilitySocialLinks={visibilitySocialLinks}
+                      formId="socialLinks"
+                      {...commonFormProps}
+                    />
                   </div>
-                  {isBlockVisible(name) && (
-                  <Name
-                    name={name}
-                    accountSettingsUrl={context.config.ACCOUNT_SETTINGS_URL}
-                    visibilityName={visibilityName}
-                    formId="name"
-                    {...commonFormProps}
-                  />
-                  )}
-                  {isBlockVisible(country) && (
-                  <Country
-                    country={country}
-                    visibilityCountry={visibilityCountry}
-                    formId="country"
-                    {...commonFormProps}
-                  />
-                  )}
-                  {isBlockVisible((languageProficiencies || []).length) && (
-                  <PreferredLanguage
-                    languageProficiencies={languageProficiencies || []}
-                    visibilityLanguageProficiencies={visibilityLanguageProficiencies}
-                    formId="languageProficiencies"
-                    {...commonFormProps}
-                  />
-                  )}
-                  {isBlockVisible(levelOfEducation) && (
-                  <Education
-                    levelOfEducation={levelOfEducation}
-                    visibilityLevelOfEducation={visibilityLevelOfEducation}
-                    formId="levelOfEducation"
-                    {...commonFormProps}
-                  />
-                  )}
+                )}
+              </div>
 
-                  <AdditionalProfileFieldsSlot />
-                </div>
-                
-                <div
-                  className={classNames([
-                    'col m-0 pr-0',
-                    isMobileView ? 'pl-0 col-12' : 'pl-40px col-6',
-                  ])}
-                >
-                  <CustomProfileCompletion />
-                  {isBlockVisible(bio) && (
-                  <Bio
-                    bio={bio}
-                    visibilityBio={visibilityBio}
-                    formId="bio"
-                    {...commonFormProps}
-                  />
-                  )}
-
-                  {isBlockVisible((socialLinks || []).some((link) => link?.socialLink !== null)) && (
-                  <SocialLinks
-                    socialLinks={socialLinks || []}
-                    draftSocialLinksByPlatform={draftSocialLinksByPlatform || {}}
-                    visibilitySocialLinks={visibilitySocialLinks}
-                    formId="socialLinks"
-                    {...commonFormProps}
-                  />
-                  )}
-                </div>
+              <div className="custom-profile-right-column">
+                <CustomProfileCompletion />
               </div>
             </div>
           </div>
+
           <CustomExtendedProfileInformation />
-          <div
-            className={classNames([
-              'col container-fluid d-inline-flex bg-color-grey-FBFAF9 h-100 w-100 align-items-start justify-content-start g-3rem',
-              isMobileView ? 'py-4 px-3' : 'px-120px py-6',
-            ])}
-          >
-            {isBlockVisible((courseCertificates || []).length) && (
-            <Certificates
-              certificates={courseCertificates || []}
-              formId="certificates"
-            />
-            )}
+
+          <div className={classNames(['custom-profile-certificates-section'])}>
+            <div className="custom-profile-card w-100">
+              <p className="custom-profile-certificate-title">
+                <FormattedMessage
+                  id={customMessages['profile.custom.page.certificates'].id}
+                  defaultMessage={customMessages['profile.custom.page.certificates'].defaultMessage}
+                />
+              </p>
+              {isBlockVisible((courseCertificates || []).length) && (
+                <Certificates
+                  certificates={courseCertificates || []}
+                  formId="certificates"
+                />
+              )}
+            </div>
           </div>
         </>
       )}
@@ -424,6 +347,8 @@ ProfilePage.propTypes = {
   languageProficiencies: PropTypes.arrayOf(PropTypes.shape({
     code: PropTypes.string.isRequired,
   })),
+  gender: PropTypes.string,
+  visibilityGender: PropTypes.string,
   visibilityLanguageProficiencies: PropTypes.string,
   name: PropTypes.string,
   visibilityName: PropTypes.string,
@@ -459,6 +384,8 @@ ProfilePage.defaultProps = {
   draftSocialLinksByPlatform: {},
   bio: null,
   languageProficiencies: [],
+  gender: null,
+  visibilityGender: null,
   courseCertificates: [],
   requiresParentalConsent: null,
   dateJoined: null,
