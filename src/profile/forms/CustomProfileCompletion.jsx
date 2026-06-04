@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { Alert, ProgressBar } from '@openedx/paragon';
 import { useIntl } from '@edx/frontend-platform/i18n';
 
@@ -15,7 +16,7 @@ const getBackendMessage = (payload) => payload?.message
   || payload?.data?.message
   || '';
 
-const CustomProfileCompletion = () => {
+const CustomProfileCompletion = ({ onVisibilityChange }) => {
   const { formatMessage } = useIntl();
   const [progressData, setProgressData] = useState(null);
   const [error, setError] = useState('');
@@ -48,6 +49,10 @@ const CustomProfileCompletion = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    onVisibilityChange(!(progressData?.hidden));
+  }, [progressData?.hidden, onVisibilityChange]);
 
   if (progressData?.hidden) {
     return null;
@@ -84,3 +89,11 @@ const CustomProfileCompletion = () => {
 };
 
 export default CustomProfileCompletion;
+
+CustomProfileCompletion.propTypes = {
+  onVisibilityChange: PropTypes.func,
+};
+
+CustomProfileCompletion.defaultProps = {
+  onVisibilityChange: () => {},
+};

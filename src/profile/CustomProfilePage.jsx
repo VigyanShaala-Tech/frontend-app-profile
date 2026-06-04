@@ -1,5 +1,5 @@
 import React, {
-  useEffect, useContext, useCallback,
+  useEffect, useContext, useCallback, useState,
 } from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
@@ -23,15 +23,14 @@ import {
 } from './data/actions';
 
 import CustomProfileAvatar from './forms/custom-profile-fields/CustomProfileAvatar';
-import Name from './forms/Name';
-// import CustomGender from './forms/custom-profile-fields/CustomGender';
-import CustomCountry from './forms/custom-profile-fields/CustomCountry';
-import PreferredLanguage from './forms/PreferredLanguage';
-import Education from './forms/Education';
+import CustomName from './forms/custom-profile-fields/CustomName';
+import CustomMobileNumber from './forms/custom-profile-fields/CustomMobileNumber';
+import CustomGender from './forms/custom-profile-fields/CustomGender';
+import CustomPreferredLanguage from './forms/custom-profile-fields/CustomPreferredLanguage';
 import CustomSocialLinks from './forms/custom-profile-fields/CustomSocialLinks';
 import CustomBio from './forms/custom-profile-fields/CustomBio';
+import CustomCertificates from './forms/custom-profile-fields/CustomCertificates';
 import PageLoading from './PageLoading';
-import Certificates from './Certificates';
 import CustomProfileCompletion from './forms/CustomProfileCompletion';
 import CustomExtendedProfileInformation from './forms/CustomDynamicExtendedProfileInformation';
 import { profilePageSelector } from './data/selectors';
@@ -59,10 +58,6 @@ const ProfilePage = ({ params }) => {
     savePhotoState,
     isLoadingProfile,
     photoUploadError,
-    country,
-    visibilityCountry,
-    levelOfEducation,
-    visibilityLevelOfEducation,
     gender,
     visibilityGender,
     socialLinks,
@@ -78,6 +73,7 @@ const ProfilePage = ({ params }) => {
 
   const navigate = useNavigate();
   const isMobileView = useIsOnMobileScreen();
+  const [isRightColumnVisible, setIsRightColumnVisible] = useState(true);
 
   useEffect(() => {
     dispatch(fetchProfile(params.username));
@@ -201,11 +197,11 @@ const ProfilePage = ({ params }) => {
               </p>
             </div>
 
-            <div className="custom-profile-content-grid">
+            <div className={classNames(['custom-profile-content-grid', !isRightColumnVisible && 'single-column'])}>
               <div className="custom-profile-left-column">
                 {isBlockVisible(name) && (
                   <div className="custom-profile-card">
-                    <Name
+                    <CustomName
                       name={name}
                       accountSettingsUrl={context.config.ACCOUNT_SETTINGS_URL}
                       visibilityName={visibilityName}
@@ -215,50 +211,28 @@ const ProfilePage = ({ params }) => {
                   </div>
                 )}
 
-                {/* Gender field temporarily disabled due to backend issue. */}
-                {/*
-                {isBlockVisible(gender) && (
-                  <div className="custom-profile-card">
-                    <CustomGender
-                      gender={gender}
-                      visibilityGender={visibilityGender}
-                      formId="gender"
-                      {...commonFormProps}
-                    />
-                  </div>
-                )}
-                */}
+                <div className="custom-profile-card">
+                  <CustomMobileNumber
+                    formId="mobileNumber"
+                    {...commonFormProps}
+                  />
+                </div>
 
-                {isBlockVisible(country) && (
-                  <div className="custom-profile-card">
-                    <CustomCountry
-                      country={country}
-                      visibilityCountry={visibilityCountry}
-                      formId="country"
-                      labelMessageId="profile.custom.location.label"
-                      defaultLabelMessage="Location"
-                      {...commonFormProps}
-                    />
-                  </div>
-                )}
+                <div className="custom-profile-card">
+                  <CustomGender
+                    gender={gender}
+                    visibilityGender={visibilityGender}
+                    formId="gender"
+                    {...commonFormProps}
+                  />
+                </div>
 
                 {isBlockVisible((languageProficiencies || []).length) && (
                   <div className="custom-profile-card">
-                    <PreferredLanguage
+                    <CustomPreferredLanguage
                       languageProficiencies={languageProficiencies || []}
                       visibilityLanguageProficiencies={visibilityLanguageProficiencies}
                       formId="languageProficiencies"
-                      {...commonFormProps}
-                    />
-                  </div>
-                )}
-
-                {isBlockVisible(levelOfEducation) && (
-                  <div className="custom-profile-card">
-                    <Education
-                      levelOfEducation={levelOfEducation}
-                      visibilityLevelOfEducation={visibilityLevelOfEducation}
-                      formId="levelOfEducation"
                       {...commonFormProps}
                     />
                   </div>
@@ -298,9 +272,11 @@ const ProfilePage = ({ params }) => {
                 )}
               </div>
 
-              <div className="custom-profile-right-column">
-                <CustomProfileCompletion />
-              </div>
+              {isRightColumnVisible && (
+                <div className="custom-profile-right-column">
+                  <CustomProfileCompletion onVisibilityChange={setIsRightColumnVisible} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -315,9 +291,8 @@ const ProfilePage = ({ params }) => {
                 />
               </p>
               {isBlockVisible((courseCertificates || []).length) && (
-                <Certificates
+                <CustomCertificates
                   certificates={courseCertificates || []}
-                  formId="certificates"
                 />
               )}
             </div>

@@ -26,6 +26,11 @@ const messages = defineMessages({
     defaultMessage: 'My Certificates',
     description: 'Heading for certificates section in custom profile page.',
   },
+  'profile.custom.page.location': {
+    id: 'profile.custom.page.location',
+    defaultMessage: 'Location',
+    description: 'Label for location field in custom profile page.',
+  },
 });
 
 export default messages;

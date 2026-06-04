@@ -122,11 +122,30 @@
   background: #f8fbff;
 }
 
+.custom-search-dropdown__option:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.custom-search-dropdown__option:disabled:hover {
+  background: #f8fafc;
+}
+
 .custom-search-dropdown__option.is-selected {
   background: #ffffff;
   border-inline-start: 2px solid var(--primary);
   color: #0f172a;
   font-weight: 600;
+}
+
+.custom-search-dropdown__option.is-disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.custom-search-dropdown__option.is-disabled:hover {
+  background: #ffffff;
 }
 
 .custom-search-dropdown__option input[type='checkbox'] {

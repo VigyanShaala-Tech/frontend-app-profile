@@ -1,3 +1,9 @@
+.custom-social-links__list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
 .custom-social-platform-heading__content {
   align-items: center;
   display: inline-flex;

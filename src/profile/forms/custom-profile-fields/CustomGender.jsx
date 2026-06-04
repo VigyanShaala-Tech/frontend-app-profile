@@ -1,145 +1,183 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
-import { FormattedMessage, injectIntl, intlShape } from '@edx/frontend-platform/i18n';
+import { useDispatch } from 'react-redux';
+import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
+import { useIntl } from '@edx/frontend-platform/i18n';
 import get from 'lodash.get';
 import { Form } from '@openedx/paragon';
 
 import messages from '../Gender.messages';
-import FormControls from '../elements/FormControls';
+import customMessages from './CustomGenderMock.messages';
+import CustomFormControls from '../custom-components/CustomFormControls';
 import EditableItemHeader from '../elements/EditableItemHeader';
 import EmptyContent from '../elements/EmptyContent';
 import SwitchContent from '../elements/SwitchContent';
-import { GENDER_OPTIONS } from '../../data/constants';
+import { fetchProfile } from '../../data/actions';
+import { patchProfile } from '../../data/services';
+import { patchGenderVisibilityPreference } from './customPreferencesApi';
 import { editableFormSelector } from '../../data/selectors';
+import { useCloseOpenHandler, useIsVisibilityEnabled } from '../../data/hooks';
 
-class CustomGender extends React.Component {
-  constructor(props) {
-    super(props);
+const CUSTOM_GENDER_OPTIONS = ['m', 'f', 'o'];
 
-    this.handleChange = this.handleChange.bind(this);
-    this.handleSubmit = this.handleSubmit.bind(this);
-    this.handleClose = this.handleClose.bind(this);
-    this.handleOpen = this.handleOpen.bind(this);
+const getCustomGenderLabelMessage = (value) => {
+  if (!value) {
+    return null;
   }
-
-  handleChange(e) {
-    const { name, value } = e.target;
-    this.props.changeHandler(name, value);
+  if (value === 'o') {
+    return messages['profile.gender.options.p'];
   }
+  const message = get(
+    messages,
+    `profile.gender.options.${value}`,
+    null,
+  );
+  return message;
+};
 
-  handleSubmit(e) {
-    e.preventDefault();
-    this.props.submitHandler(this.props.formId);
-  }
+const CustomGender = ({
+  formId,
+  gender,
+  visibilityGender,
+  editMode,
+  saveState,
+  error,
+  closeHandler,
+  openHandler,
+}) => {
+  const dispatch = useDispatch();
+  const { formatMessage } = useIntl();
+  const isVisibilityEnabled = useIsVisibilityEnabled();
+  const handleOpen = useCloseOpenHandler(openHandler, formId);
+  const handleClose = useCloseOpenHandler(closeHandler, formId);
+  const [draftGender, setDraftGender] = useState(gender || '');
+  const [draftVisibilityGender, setDraftVisibilityGender] = useState(visibilityGender || 'private');
+  const [committedGender, setCommittedGender] = useState(gender || '');
+  const [committedVisibilityGender, setCommittedVisibilityGender] = useState(visibilityGender || 'private');
+  const [localSaveState, setLocalSaveState] = useState(null);
+  const [localError, setLocalError] = useState(null);
 
-  handleClose() {
-    this.props.closeHandler(this.props.formId);
-  }
+  useEffect(() => {
+    setCommittedGender(gender || '');
+    setCommittedVisibilityGender(visibilityGender || 'private');
+  }, [gender, visibilityGender]);
 
-  handleOpen() {
-    this.props.openHandler(this.props.formId);
-  }
+  useEffect(() => {
+    if (editMode === 'editing') {
+      setDraftGender(committedGender || '');
+      setDraftVisibilityGender(committedVisibilityGender || 'private');
+      setLocalSaveState(null);
+      setLocalError(null);
+    }
+  }, [editMode, committedGender, committedVisibilityGender]);
 
-  render() {
-    const {
-      formId, gender, visibilityGender, editMode, saveState, error, intl,
-    } = this.props;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setLocalSaveState('pending');
+    setLocalError(null);
+    try {
+      const username = getAuthenticatedUser().username;
+      await patchProfile(username, { gender: draftGender || '' });
+      if (draftVisibilityGender !== committedVisibilityGender) {
+        await patchGenderVisibilityPreference(username, draftVisibilityGender);
+      }
+      setCommittedGender(draftGender || '');
+      setCommittedVisibilityGender(draftVisibilityGender || 'private');
+      setLocalSaveState('complete');
+      closeHandler(formId);
+      dispatch(fetchProfile(username));
+    } catch (submitError) {
+      setLocalSaveState('error');
+      setLocalError(submitError?.processedData?.gender || submitError?.response?.data?.message || error);
+    }
+  };
 
-    return (
-      <SwitchContent
-        className="mb-5"
-        expression={editMode}
-        cases={{
-          editing: (
-            <div role="dialog" aria-labelledby={`${formId}-label`}>
-              <form onSubmit={this.handleSubmit}>
-                <Form.Group controlId={formId} isInvalid={error !== null}>
-                  <label className="edit-section-header" htmlFor={formId}>
-                    {intl.formatMessage(messages['profile.gender.gender'])}
-                  </label>
-                  <select
-                    data-hj-suppress
-                    className="d-inline-block form-control"
-                    id={formId}
-                    name={formId}
-                    value={gender || ''}
-                    onChange={this.handleChange}
-                  >
-                    <option value="">&nbsp;</option>
-                    {GENDER_OPTIONS.map(option => (
-                      <option key={option} value={option}>
-                        {intl.formatMessage(get(
-                          messages,
-                          `profile.gender.options.${option}`,
-                          messages['profile.gender.options.o'],
-                        ))}
-                      </option>
-                    ))}
-                  </select>
-                  {error !== null && (
-                    <Form.Control.Feedback hasIcon={false}>
-                      {error}
-                    </Form.Control.Feedback>
-                  )}
-                </Form.Group>
-                <FormControls
-                  visibilityId="visibilityGender"
-                  saveState={saveState}
-                  visibility={visibilityGender}
-                  cancelHandler={this.handleClose}
-                  changeHandler={this.handleChange}
-                />
-              </form>
-            </div>
-          ),
-          editable: (
-            <>
-              <EditableItemHeader
-                content={intl.formatMessage(messages['profile.gender.gender'])}
-                showEditButton
-                onClickEdit={this.handleOpen}
-                showVisibility={visibilityGender !== null}
-                visibility={visibilityGender}
+  return (
+    <SwitchContent
+      className="mb-5"
+      expression={editMode}
+      cases={{
+        editing: (
+          <div role="dialog" aria-labelledby={`${formId}-label`}>
+            <form onSubmit={handleSubmit}>
+              <Form.Group controlId={formId} isInvalid={Boolean(localError || error)}>
+                <label className="edit-section-header" htmlFor={formId}>
+                  {formatMessage(messages['profile.gender.gender'])}
+                </label>
+                <select
+                  data-hj-suppress
+                  className="d-inline-block form-control"
+                  id={formId}
+                  name={formId}
+                  value={draftGender}
+                  onChange={(event) => setDraftGender(event.target.value)}
+                >
+                  <option value="">&nbsp;</option>
+                  {CUSTOM_GENDER_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {formatMessage(getCustomGenderLabelMessage(option))}
+                    </option>
+                  ))}
+                </select>
+                {(localError || error) && (
+                  <Form.Control.Feedback hasIcon={false}>
+                    {localError || error}
+                  </Form.Control.Feedback>
+                )}
+              </Form.Group>
+              <CustomFormControls
+                visibilityId="visibilityGender"
+                saveState={localSaveState || saveState}
+                visibility={draftVisibilityGender}
+                cancelHandler={handleClose}
+                onVisibilityChange={setDraftVisibilityGender}
               />
-              <p data-hj-suppress className="h5">
-                {intl.formatMessage(get(
-                  messages,
-                  `profile.gender.options.${gender}`,
-                  messages['profile.gender.options.o'],
-                ))}
-              </p>
-            </>
-          ),
-          empty: (
-            <>
-              <EditableItemHeader content={intl.formatMessage(messages['profile.gender.gender'])} />
-              <EmptyContent onClick={this.handleOpen}>
-                <FormattedMessage
-                  id="profile.gender.empty"
-                  defaultMessage="Add gender"
-                  description="instructions when the user doesn't have their gender set"
-                />
-              </EmptyContent>
-            </>
-          ),
-          static: (
-            <>
-              <EditableItemHeader content={intl.formatMessage(messages['profile.gender.gender'])} />
-              <p data-hj-suppress className="h5">
-                {intl.formatMessage(get(
-                  messages,
-                  `profile.gender.options.${gender}`,
-                  messages['profile.gender.options.o'],
-                ))}
-              </p>
-            </>
-          ),
-        }}
-      />
-    );
-  }
-}
+            </form>
+          </div>
+        ),
+        editable: (
+          <>
+            <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
+              {formatMessage(messages['profile.gender.gender'])}
+            </p>
+            <EditableItemHeader
+              content={getCustomGenderLabelMessage(committedGender)
+                ? formatMessage(getCustomGenderLabelMessage(committedGender))
+                : '-'}
+              showEditButton
+              onClickEdit={handleOpen}
+              showVisibility={committedVisibilityGender !== null && isVisibilityEnabled}
+              visibility={committedVisibilityGender}
+            />
+          </>
+        ),
+        empty: (
+          <>
+            <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
+              {formatMessage(messages['profile.gender.gender'])}
+            </p>
+            <EmptyContent onClick={handleOpen}>
+              {formatMessage(customMessages['profile.custom.gender.empty'])}
+            </EmptyContent>
+          </>
+        ),
+        static: (
+          <>
+            <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
+              {formatMessage(messages['profile.gender.gender'])}
+            </p>
+            <p data-hj-suppress className="h5">
+              {getCustomGenderLabelMessage(committedGender)
+                ? formatMessage(getCustomGenderLabelMessage(committedGender))
+                : '-'}
+            </p>
+          </>
+        ),
+      }}
+    />
+  );
+};
 
 CustomGender.propTypes = {
   formId: PropTypes.string.isRequired,
@@ -148,11 +186,8 @@ CustomGender.propTypes = {
   editMode: PropTypes.oneOf(['editing', 'editable', 'empty', 'static']),
   saveState: PropTypes.string,
   error: PropTypes.string,
-  changeHandler: PropTypes.func.isRequired,
-  submitHandler: PropTypes.func.isRequired,
   closeHandler: PropTypes.func.isRequired,
   openHandler: PropTypes.func.isRequired,
-  intl: intlShape.isRequired,
 };
 
 CustomGender.defaultProps = {
@@ -166,4 +201,4 @@ CustomGender.defaultProps = {
 export default connect(
   editableFormSelector,
   {},
-)(injectIntl(CustomGender));
+)(CustomGender);
