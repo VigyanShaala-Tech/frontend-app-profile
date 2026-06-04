@@ -1,57 +1,62 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { useIntl } from '@edx/frontend-platform/i18n';
+import get from 'lodash.get';
 import { Form } from '@openedx/paragon';
-import classNames from 'classnames';
 
-import messages from '../Bio.messages';
-import customMessages from './CustomBio.messages';
+import messages from '../Education.messages';
+import customMessages from './CustomEducation.messages';
 import CustomFormControls from '../custom-components/CustomFormControls';
 import EditableItemHeader from '../elements/EditableItemHeader';
 import EmptyContent from '../elements/EmptyContent';
 import SwitchContent from '../elements/SwitchContent';
+import CustomSearchDropdown from '../custom-components/CustomSearchDropdown';
+import { EDUCATION_LEVELS } from '../../data/constants';
 import { editableFormSelector } from '../../data/selectors';
 import {
   useCloseOpenHandler,
-  useHandleChange,
   useHandleSubmit,
-  useIsOnMobileScreen,
   useIsVisibilityEnabled,
 } from '../../data/hooks';
 
-const CustomBio = ({
+const CustomEducation = ({
   formId,
-  bio,
-  visibilityBio,
+  levelOfEducation,
+  visibilityLevelOfEducation,
   editMode,
   saveState,
   error,
-  titleMessageId,
-  defaultTitleMessage,
   changeHandler,
   submitHandler,
   closeHandler,
   openHandler,
 }) => {
-  const isMobileView = useIsOnMobileScreen();
   const isVisibilityEnabled = useIsVisibilityEnabled();
   const { formatMessage } = useIntl();
 
-  const sectionTitle = titleMessageId
-    ? formatMessage({ id: titleMessageId, defaultMessage: defaultTitleMessage })
-    : formatMessage(messages['profile.bio.about.me']);
-
-  const handleChange = useHandleChange(changeHandler);
   const handleSubmit = useHandleSubmit(submitHandler, formId);
   const handleOpen = useCloseOpenHandler(openHandler, formId);
   const handleClose = useCloseOpenHandler(closeHandler, formId);
 
+  const educationOptions = useMemo(() => EDUCATION_LEVELS.map((level) => ({
+    value: level,
+    label: formatMessage(get(
+      messages,
+      `profile.education.levels.${level}`,
+      messages['profile.education.levels.o'],
+    )),
+  })), [formatMessage]);
+
+  const selectedEducationLabel = formatMessage(get(
+    messages,
+    `profile.education.levels.${levelOfEducation}`,
+    messages['profile.education.levels.o'],
+  ));
+
   return (
     <SwitchContent
-      className={classNames([
-        isMobileView ? 'pt-40px' : 'pt-0',
-      ])}
+      className="pt-40px"
       expression={editMode}
       cases={{
         editing: (
@@ -63,14 +68,14 @@ const CustomBio = ({
                 isInvalid={error !== null}
               >
                 <p data-hj-suppress className="h5 font-weight-bold m-0 pb-2.5">
-                  {sectionTitle}
+                  {formatMessage(messages['profile.education.education'])}
                 </p>
-                <textarea
-                  className="form-control py-10px"
+                <CustomSearchDropdown
                   id={formId}
-                  name={formId}
-                  value={bio}
-                  onChange={handleChange}
+                  options={educationOptions}
+                  value={levelOfEducation || ''}
+                  onChange={(selectedValue) => changeHandler(formId, selectedValue)}
+                  isInvalid={error !== null}
                 />
                 {error !== null && (
                   <Form.Control.Feedback hasIcon={false}>
@@ -79,11 +84,11 @@ const CustomBio = ({
                 )}
               </Form.Group>
               <CustomFormControls
-                visibilityId="visibilityBio"
+                visibilityId="visibilityLevelOfEducation"
                 saveState={saveState}
-                visibility={visibilityBio}
+                visibility={visibilityLevelOfEducation}
                 cancelHandler={handleClose}
-                onVisibilityChange={(selectedVisibility) => changeHandler('visibilityBio', selectedVisibility)}
+                onVisibilityChange={(selectedVisibility) => changeHandler('visibilityLevelOfEducation', selectedVisibility)}
               />
             </form>
           </div>
@@ -91,33 +96,33 @@ const CustomBio = ({
         editable: (
           <>
             <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
-              {sectionTitle}
+              {formatMessage(messages['profile.education.education'])}
             </p>
             <EditableItemHeader
-              content={bio}
+              content={selectedEducationLabel}
               showEditButton
               onClickEdit={handleOpen}
-              showVisibility={visibilityBio !== null && isVisibilityEnabled}
-              visibility={visibilityBio}
+              showVisibility={visibilityLevelOfEducation !== null && isVisibilityEnabled}
+              visibility={visibilityLevelOfEducation}
             />
           </>
         ),
         empty: (
           <>
             <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
-              {sectionTitle}
+              {formatMessage(messages['profile.education.education'])}
             </p>
             <EmptyContent onClick={handleOpen}>
-              {formatMessage(customMessages['profile.custom.bio.empty'])}
+              {formatMessage(customMessages['profile.custom.education.empty'])}
             </EmptyContent>
           </>
         ),
         static: (
           <>
             <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5">
-              {sectionTitle}
+              {formatMessage(messages['profile.education.education'])}
             </p>
-            <EditableItemHeader content={bio} />
+            <EditableItemHeader content={selectedEducationLabel} />
           </>
         ),
       }}
@@ -125,32 +130,28 @@ const CustomBio = ({
   );
 };
 
-CustomBio.propTypes = {
+CustomEducation.propTypes = {
   formId: PropTypes.string.isRequired,
-  bio: PropTypes.string,
-  visibilityBio: PropTypes.oneOf(['private', 'all_users']),
+  levelOfEducation: PropTypes.string,
+  visibilityLevelOfEducation: PropTypes.oneOf(['private', 'all_users']),
   editMode: PropTypes.oneOf(['editing', 'editable', 'empty', 'static']),
   saveState: PropTypes.string,
   error: PropTypes.string,
-  titleMessageId: PropTypes.string,
-  defaultTitleMessage: PropTypes.string,
   changeHandler: PropTypes.func.isRequired,
   submitHandler: PropTypes.func.isRequired,
   closeHandler: PropTypes.func.isRequired,
   openHandler: PropTypes.func.isRequired,
 };
 
-CustomBio.defaultProps = {
+CustomEducation.defaultProps = {
   editMode: 'static',
   saveState: null,
-  bio: null,
-  visibilityBio: 'private',
+  levelOfEducation: null,
+  visibilityLevelOfEducation: 'private',
   error: null,
-  titleMessageId: null,
-  defaultTitleMessage: 'About me',
 };
 
 export default connect(
   editableFormSelector,
   {},
-)(CustomBio);
+)(CustomEducation);

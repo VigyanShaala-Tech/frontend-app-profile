@@ -29,6 +29,16 @@ const getBackendMessage = (payload) => payload?.message
 
 const getErrorMessage = (error) => getBackendMessage(error?.response?.data);
 
+const resolveOptionValue = (option) => {
+  if (typeof option === 'string') {
+    return option;
+  }
+  if (!option || typeof option !== 'object') {
+    return '';
+  }
+  return option.value || option.code || option.id || option.key || option.label || option.name || '';
+};
+
 const CustomExtendedProfileInformation = () => {
   const { formatMessage } = useIntl();
   const [sections, setSections] = useState([]);
@@ -565,7 +575,8 @@ const mapSavedToFormData = (savedData, fields) => {
     const value = savedData?.[field.name];
     if (field.customOption && field.customFieldName) {
       const options = Array.isArray(field.options) ? field.options : [];
-      if (value && !options.includes(value)) {
+      const optionValues = options.map((option) => resolveOptionValue(option)).filter(Boolean);
+      if (value && !optionValues.includes(value)) {
         data[field.name] = 'Others';
         data[field.customFieldName] = value;
       } else {

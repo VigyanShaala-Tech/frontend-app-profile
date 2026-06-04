@@ -12,6 +12,26 @@ const PANEL_MAX_HEIGHT = 280;
 const PANEL_MIN_HEIGHT = 180;
 const VIEWPORT_SAFE_GAP = 12;
 
+const resolveOptionValue = (option) => {
+  if (typeof option === 'string') {
+    return option;
+  }
+  if (!option || typeof option !== 'object') {
+    return '';
+  }
+  return option.value || option.code || option.id || option.key || option.label || option.name || '';
+};
+
+const resolveOptionLabel = (option, fallbackValue) => {
+  if (typeof option === 'string') {
+    return option;
+  }
+  if (!option || typeof option !== 'object') {
+    return fallbackValue;
+  }
+  return option.label || option.name || fallbackValue;
+};
+
 const CustomSearchDropdown = ({
   id,
   options,
@@ -28,7 +48,17 @@ const CustomSearchDropdown = ({
   const [panelMaxHeight, setPanelMaxHeight] = useState(PANEL_MAX_HEIGHT);
   const [reservedParentSpace, setReservedParentSpace] = useState(0);
   const wrapperRef = useRef(null);
-  const hasSearch = options.length > SEARCH_THRESHOLD;
+  const normalizedOptions = useMemo(() => options
+    .map((option) => {
+      const optionValue = resolveOptionValue(option);
+      return {
+        key: optionValue || JSON.stringify(option),
+        value: optionValue,
+        label: resolveOptionLabel(option, optionValue),
+      };
+    })
+    .filter((option) => option.value), [options]);
+  const hasSearch = normalizedOptions.length > SEARCH_THRESHOLD;
 
   const normalizedValue = useMemo(() => {
     if (multiple) {
@@ -45,19 +75,24 @@ const CustomSearchDropdown = ({
 
   const filteredOptions = useMemo(() => {
     if (!search.trim()) {
-      return options;
+      return normalizedOptions;
     }
     const normalizedSearch = search.trim().toLowerCase();
-    return options.filter((option) => option.toLowerCase().includes(normalizedSearch));
-  }, [search, options]);
+    return normalizedOptions.filter((option) => option.label.toLowerCase().includes(normalizedSearch));
+  }, [search, normalizedOptions]);
+
+  const labelByValue = useMemo(() => normalizedOptions.reduce((acc, option) => {
+    acc[option.value] = option.label;
+    return acc;
+  }, {}), [normalizedOptions]);
 
   const triggerLabel = useMemo(() => {
     if (multiple) {
       if (!normalizedValue.length) return resolvedPlaceholder;
-      return normalizedValue.join(', ');
+      return normalizedValue.map((selectedValue) => labelByValue[selectedValue] || selectedValue).join(', ');
     }
-    return normalizedValue || resolvedPlaceholder;
-  }, [multiple, normalizedValue, resolvedPlaceholder]);
+    return labelByValue[normalizedValue] || normalizedValue || resolvedPlaceholder;
+  }, [multiple, normalizedValue, resolvedPlaceholder, labelByValue]);
 
   useEffect(() => {
     const handleOutsideClick = (event) => {
@@ -70,6 +105,12 @@ const CustomSearchDropdown = ({
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch('');
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -120,15 +161,14 @@ const CustomSearchDropdown = ({
 
   const handleSelect = (option) => {
     if (multiple) {
-      const selectedOptions = normalizedValue.includes(option)
-        ? normalizedValue.filter((selectedOption) => selectedOption !== option)
-        : [...normalizedValue, option];
+      const selectedOptions = normalizedValue.includes(option.value)
+        ? normalizedValue.filter((selectedOption) => selectedOption !== option.value)
+        : [...normalizedValue, option.value];
       onChange(selectedOptions);
       return;
     }
-    onChange(option);
+    onChange(option.value);
     setIsOpen(false);
-    setSearch('');
   };
 
   const removeSelection = (option) => {
@@ -165,7 +205,7 @@ const CustomSearchDropdown = ({
         <div className="custom-search-dropdown__chips">
           {normalizedValue.map((selectedOption) => (
             <span key={selectedOption} className="custom-search-dropdown__chip">
-              {selectedOption}
+              {labelByValue[selectedOption] || selectedOption}
               <button
                 type="button"
                 className="custom-search-dropdown__chip-btn"
@@ -203,12 +243,12 @@ const CustomSearchDropdown = ({
             )}
             {filteredOptions.map((option) => {
               const isSelected = multiple
-                ? normalizedValue.includes(option)
-                : normalizedValue === option;
+                ? normalizedValue.includes(option.value)
+                : normalizedValue === option.value;
 
               return (
                 <button
-                  key={option}
+                  key={option.key}
                   type="button"
                   className={`custom-search-dropdown__option ${isSelected ? 'is-selected' : ''}`}
                   onClick={() => handleSelect(option)}
@@ -216,7 +256,7 @@ const CustomSearchDropdown = ({
                   {multiple && (
                     <input type="checkbox" readOnly checked={isSelected} />
                   )}
-                  <span>{option}</span>
+                  <span>{option.label}</span>
                 </button>
               );
             })}
@@ -229,7 +269,17 @@ const CustomSearchDropdown = ({
 
 CustomSearchDropdown.propTypes = {
   id: PropTypes.string.isRequired,
-  options: PropTypes.arrayOf(PropTypes.string),
+  options: PropTypes.arrayOf(PropTypes.oneOfType([
+    PropTypes.string,
+    PropTypes.shape({
+      value: PropTypes.string,
+      label: PropTypes.string,
+      code: PropTypes.string,
+      name: PropTypes.string,
+      id: PropTypes.string,
+      key: PropTypes.string,
+    }),
+  ])),
   value: PropTypes.oneOfType([
     PropTypes.string,
     PropTypes.arrayOf(PropTypes.string),

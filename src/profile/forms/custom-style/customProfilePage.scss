@@ -151,6 +151,10 @@
   grid-template-columns: 2fr 1fr;
 }
 
+.custom-profile-content-grid.single-column {
+  grid-template-columns: 1fr;
+}
+
 .custom-profile-left-column,
 .custom-profile-right-column {
   display: flex;
@@ -186,6 +190,38 @@
   font-size: 18px;
   font-weight: 700;
   margin: 0 0 12px;
+}
+
+.custom-certificates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.custom-certificate-row {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.custom-certificate-row__content {
+  min-width: 0;
+}
+
+.custom-certificate-row__content .h4 {
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.custom-certificate-row__action {
+  display: flex;
+  justify-content: flex-end;
+  margin-left: 16px;
+  white-space: nowrap;
 }
 
 /* Custom-page only: convert icon-only edit action into text button */
@@ -338,6 +374,21 @@
 
   .custom-profile-certificates-section {
     padding: 20px 14px 28px;
+  }
+
+  .custom-certificate-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .custom-certificate-row__action {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .custom-certificate-row__action .btn {
+    width: 100%;
   }
 }
 

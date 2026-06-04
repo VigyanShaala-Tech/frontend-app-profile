@@ -1,37 +1,38 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Alert } from '@openedx/paragon';
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTwitter, faFacebook, faLinkedin } from '@fortawesome/free-brands-svg-icons';
-import { FormattedMessage } from '@edx/frontend-platform/i18n';
+import { useIntl } from '@edx/frontend-platform/i18n';
 import classNames from 'classnames';
 
-import FormControls from '../elements/FormControls';
+import CustomFormControls from '../custom-components/CustomFormControls';
 import EditableItemHeader from '../elements/EditableItemHeader';
 import EmptyContent from '../elements/EmptyContent';
 import SwitchContent from '../elements/SwitchContent';
 import { editableFormSelector } from '../../data/selectors';
 import { useIsVisibilityEnabled } from '../../data/hooks';
+import messages from './CustomSocialLinks.messages';
 import './customSocialLinks.scss';
 
-const platformDisplayInfo = {
+const platformDisplayInfo = (formatMessage) => ({
   facebook: {
     icon: faFacebook,
-    name: 'Facebook',
+    name: formatMessage(messages['profile.custom.social.platform.facebook']),
   },
   twitter: {
     icon: faTwitter,
-    name: 'X',
+    name: formatMessage(messages['profile.custom.social.platform.twitter']),
   },
   linkedin: {
     icon: faLinkedin,
-    name: 'LinkedIn',
+    name: formatMessage(messages['profile.custom.social.platform.linkedin']),
   },
-};
+});
 
-const PlatformHeading = ({ platform }) => {
-  const info = platformDisplayInfo[platform];
+const PlatformHeading = ({ platform, platformInfo }) => {
+  const info = platformInfo[platform];
 
   return (
     <p data-hj-suppress className="h5 font-weight-bold m-0 pb-1.5 custom-social-platform-heading">
@@ -45,6 +46,10 @@ const PlatformHeading = ({ platform }) => {
 
 PlatformHeading.propTypes = {
   platform: PropTypes.oneOf(['facebook', 'twitter', 'linkedin']).isRequired,
+  platformInfo: PropTypes.objectOf(PropTypes.shape({
+    icon: PropTypes.shape({}),
+    name: PropTypes.string,
+  })).isRequired,
 };
 
 const CustomSocialLinks = ({
@@ -60,8 +65,16 @@ const CustomSocialLinks = ({
   closeHandler,
   openHandler,
 }) => {
+  const { formatMessage } = useIntl();
   const isVisibilityEnabled = useIsVisibilityEnabled();
   const [activePlatform, setActivePlatform] = useState(null);
+  const platformInfo = platformDisplayInfo(formatMessage);
+
+  useEffect(() => {
+    if (editMode !== 'editing' && activePlatform !== null) {
+      setActivePlatform(null);
+    }
+  }, [editMode, activePlatform]);
 
   const mergeWithDrafts = (newSocialLink) => {
     const knownPlatforms = ['twitter', 'facebook', 'linkedin'];
@@ -130,13 +143,12 @@ const CustomSocialLinks = ({
                 aria-describedby="social-error-feedback"
               />
             </div>
-            <FormControls
+            <CustomFormControls
               visibilityId="visibilitySocialLinks"
               saveState={saveState}
               visibility={visibilitySocialLinks}
               cancelHandler={handleClose}
-              changeHandler={handleChange}
-              submitHandler={handleSubmit}
+              onVisibilityChange={(selectedVisibility) => changeHandler('visibilitySocialLinks', selectedVisibility)}
             />
           </div>
         </form>
@@ -157,7 +169,7 @@ const CustomSocialLinks = ({
     }
     return (
       <EmptyContent onClick={() => handleOpen(platform)}>
-        Add {platformDisplayInfo[platform].name}
+        {formatMessage(messages['profile.custom.social.add.network'], { network: platformInfo[platform].name })}
       </EmptyContent>
     );
   };
@@ -169,19 +181,14 @@ const CustomSocialLinks = ({
       cases={{
         empty: (
           <div>
-            <div>
+            <div className="custom-social-links__list">
               {socialLinks.map(({ platform }) => (
-                <div key={platform} className="pt-40px">
-                  <PlatformHeading platform={platform} />
+                <div key={platform} className="custom-social-links__item">
+                  <PlatformHeading platform={platform} platformInfo={platformInfo} />
                   <EmptyContent onClick={() => handleOpen(platform)}>
-                    <FormattedMessage
-                      id="profile.sociallinks.add"
-                      defaultMessage="Add {network} profile"
-                      values={{
-                        network: platformDisplayInfo[platform].name,
-                      }}
-                      description="{network} is the name of a social network such as Facebook or Twitter"
-                    />
+                    {formatMessage(messages['profile.custom.social.add.network.profile'], {
+                      network: platformInfo[platform].name,
+                    })}
                   </EmptyContent>
                 </div>
               ))}
@@ -190,15 +197,15 @@ const CustomSocialLinks = ({
         ),
         static: (
           <div>
-            <div>
+            <div className="custom-social-links__list">
               {socialLinks
                 .filter(({ socialLink }) => Boolean(socialLink))
                 .map(({ platform, socialLink }) => (
-                  <div key={platform} className="pt-40px">
-                    <PlatformHeading platform={platform} />
+                  <div key={platform} className="custom-social-links__item">
+                    <PlatformHeading platform={platform} platformInfo={platformInfo} />
                     <EditableItemHeader
                       content={socialLink}
-                      contentPrefix={`${platformDisplayInfo[platform].name}: `}
+                      contentPrefix={`${platformInfo[platform].name}: `}
                     />
                   </div>
                 ))}
@@ -207,11 +214,11 @@ const CustomSocialLinks = ({
         ),
         editable: (
           <div>
-            <div>
+            <div className="custom-social-links__list">
               {socialLinks.map(({ platform, socialLink }) => (
-                <div key={platform} className="pt-40px">
-                  <PlatformHeading platform={platform} />
-                  {renderPlatformContent(platform, socialLink, activePlatform === platform)}
+                <div key={platform} className="custom-social-links__item">
+                  <PlatformHeading platform={platform} platformInfo={platformInfo} />
+                  {renderPlatformContent(platform, socialLink, false)}
                 </div>
               ))}
             </div>
@@ -219,11 +226,11 @@ const CustomSocialLinks = ({
         ),
         editing: (
           <div>
-            <div>
+            <div className="custom-social-links__list">
               {socialLinks.map(({ platform, socialLink }) => (
-                <div key={platform} className="pt-40px">
-                  <PlatformHeading platform={platform} />
-                  {renderPlatformContent(platform, socialLink, activePlatform === platform)}
+                <div key={platform} className="custom-social-links__item">
+                  <PlatformHeading platform={platform} platformInfo={platformInfo} />
+                  {renderPlatformContent(platform, socialLink, editMode === 'editing' && activePlatform === platform)}
                 </div>
               ))}
             </div>
