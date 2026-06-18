@@ -1,0 +1,210 @@
+.custom-search-dropdown {
+  position: relative;
+}
+
+.custom-search-dropdown.is-open {
+  z-index: 25;
+}
+
+.custom-search-dropdown__trigger {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #111827;
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  justify-content: space-between;
+  line-height: 20px;
+  min-height: 40px;
+  padding: 9px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  width: 100%;
+}
+
+.custom-search-dropdown__trigger.is-invalid {
+  border-color: #d23228;
+}
+
+.custom-search-dropdown__trigger.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
+}
+
+.custom-search-dropdown__trigger:hover {
+  border-color: #94a3b8;
+}
+
+.custom-search-dropdown__trigger:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.16);
+}
+
+.custom-search-dropdown__trigger-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-search-dropdown__placeholder {
+  color: #6b7280;
+}
+
+.custom-search-dropdown__panel {
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  display: flex;
+  flex-direction: column;
+  left: 0;
+  margin-top: 6px;
+  max-height: 280px;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 40;
+}
+
+.custom-search-dropdown__panel.is-up {
+  bottom: calc(100% + 6px);
+  margin-top: 0;
+  top: auto;
+}
+
+.custom-search-dropdown__search-wrap {
+  border-bottom: 1px solid #e6edf5;
+  padding: 10px;
+}
+
+.custom-search-dropdown__search {
+  border: 1px solid #d4deea;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 20px;
+  padding: 7px 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+}
+
+.custom-search-dropdown__search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.16);
+  outline: none;
+}
+
+.custom-search-dropdown__options {
+  flex: 1 1 auto;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.custom-search-dropdown__option {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: 14px;
+  gap: 10px;
+  justify-content: flex-start;
+  line-height: 20px;
+  padding: 9px 12px;
+  text-align: left;
+  width: 100%;
+}
+
+.custom-search-dropdown__option:hover {
+  background: #f8fbff;
+}
+
+.custom-search-dropdown__option:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.custom-search-dropdown__option:disabled:hover {
+  background: #f8fafc;
+}
+
+.custom-search-dropdown__option.is-selected {
+  background: #ffffff;
+  border-inline-start: 2px solid var(--primary);
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.custom-search-dropdown__option.is-disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.custom-search-dropdown__option.is-disabled:hover {
+  background: #ffffff;
+}
+
+.custom-search-dropdown__option input[type='checkbox'] {
+  accent-color: var(--primary);
+  height: 14px;
+  margin: 0;
+  width: 14px;
+}
+
+.custom-search-dropdown__empty {
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 18px;
+  padding: 12px;
+}
+
+.custom-search-dropdown__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.custom-search-dropdown__chip {
+  align-items: center;
+  background: rgba(var(--primary-rgb), 0.12);
+  border: 1px solid rgba(var(--primary-rgb), 0.26);
+  border-radius: 999px;
+  color: var(--primary-dark);
+  display: inline-flex;
+  font-size: 12px;
+  line-height: 16px;
+  padding: 4px 10px;
+}
+
+.custom-search-dropdown__chip-btn {
+  background: transparent;
+  border: 0;
+  color: var(--primary-dark);
+  cursor: pointer;
+  margin-left: 6px;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  .custom-search-dropdown__trigger {
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  .custom-search-dropdown__panel {
+    max-height: min(260px, 60vh);
+  }
+
+  .custom-search-dropdown__option {
+    padding: 8px 10px;
+  }
+
+  .custom-search-dropdown__chips {
+    gap: 4px;
+  }
+}

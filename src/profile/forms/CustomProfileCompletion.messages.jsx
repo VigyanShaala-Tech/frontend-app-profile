@@ -12,6 +12,16 @@ const messages = defineMessages({
       'Complete your profile to unlock more features and personalized recommendations.',
     description: 'Description text shown below profile completion progress bar',
   },
+  'profile.completion.count': {
+    id: 'profile.completion.count',
+    defaultMessage: '({completed}/{total})',
+    description: 'Display for completed profile fields count.',
+  },
+  'profile.completion.error': {
+    id: 'profile.completion.error',
+    defaultMessage: 'Could not load profile progress.',
+    description: 'Fallback error message when progress API fails.',
+  },
 });
 
 export default messages;

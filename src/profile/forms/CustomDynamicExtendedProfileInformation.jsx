@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import {
+  Alert,
   Form,
   Button,
   StatefulButton,
@@ -7,22 +9,41 @@ import {
 import {
   faChevronDown,
   faChevronUp,
-  faClose,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-
 import { getConfig } from '@edx/frontend-platform';
 import { getAuthenticatedHttpClient } from '@edx/frontend-platform/auth';
+import { useIntl } from '@edx/frontend-platform/i18n';
 
 import './customDynamicExtendedProfileInformation.scss';
+import './custom-style/customGlobalStyle.scss';
 import { emitProfileEvent, PROFILE_EVENTS } from '../../utils/profileEvents';
 import messages from './CustomDynamicExtendedProfileInformation.messages';
-import { useIntl } from '@edx/frontend-platform/i18n';
+import CustomSearchDropdown from './custom-components/CustomSearchDropdown';
+
+const getBackendMessage = (payload) => payload?.message
+  || payload?.detail
+  || payload?.error
+  || payload?.data?.message
+  || '';
+
+const getErrorMessage = (error) => getBackendMessage(error?.response?.data);
+
+const resolveOptionValue = (option) => {
+  if (typeof option === 'string') {
+    return option;
+  }
+  if (!option || typeof option !== 'object') {
+    return '';
+  }
+  return option.value || option.code || option.id || option.key || option.label || option.name || '';
+};
 
 const CustomExtendedProfileInformation = () => {
   const { formatMessage } = useIntl();
   const [sections, setSections] = useState([]);
   const [hidden, setHidden] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState('');
 
   useEffect(() => {
     const { LMS_BASE_URL } = getConfig();
@@ -32,224 +53,215 @@ const CustomExtendedProfileInformation = () => {
         const client = getAuthenticatedHttpClient();
         const { data } = await client.get(`${LMS_BASE_URL}/profile/dynamic-form/`);
         setSections(Array.isArray(data.data) ? data.data : []);
-        setHidden(data.hidden);
-      } catch (err) {
-        console.error('Failed to load dynamic form:', err);
+        setHidden(Boolean(data.hidden));
+        setLoadErrorMessage('');
+      } catch (error) {
         setSections([]);
+        setLoadErrorMessage(
+          getErrorMessage(error) || formatMessage(messages['Extended.Profile.Information.load.error']),
+        );
       }
     };
 
     fetchSections();
-  }, []);
-  
+  }, [formatMessage]);
+
   if (hidden) {
     return null;
   }
 
   return (
-    <div className="container-fluid mt-4 mb-4 p-4 extended-profile-information">
-      <h3 className="extended-prfile-info-container-title">{formatMessage(messages['Extended.Profile.Information.title'])}</h3>
-      <p>{formatMessage(messages['Extended.Profile.Information.description'])}</p>
-      <div className="row">
-        {sections.map((section, idx) => (
-          <div key={idx} className="col-md-6 mb-4">
-            <GenericSection config={section} />
-          </div>
-        ))}
+    <div className="custom-extended-wrapper">
+      <div className="extended-profile-information custom-profile-soft-card">
+        <div className="extended-profile-information__heading">
+          <h3 className="custom-profile-section-title">
+            {formatMessage(messages['Extended.Profile.Information.title'])}
+          </h3>
+          <p className="custom-profile-section-description">
+            {formatMessage(messages['Extended.Profile.Information.description'])}
+          </p>
+        </div>
+        {loadErrorMessage && (
+          <Alert variant="danger" dismissible={false} show className="mb-3">
+            {loadErrorMessage}
+          </Alert>
+        )}
+        <div className="extended-profile-information__grid">
+          {sections.map((section) => (
+            <GenericSection key={section.name} config={section} />
+          ))}
+        </div>
       </div>
     </div>
   );
 };
 
 const GenericSection = ({ config }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const { formatMessage } = useIntl();
+  const [isOpen, setIsOpen] = useState(Boolean(config.defaultOpen));
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({});
   const [savedData, setSavedData] = useState(null);
-  const [multiOpen, setMultiOpen] = useState({});
   const [errors, setErrors] = useState({});
+  const [statusMessage, setStatusMessage] = useState({ type: '', message: '' });
 
-  const hasSavedData = !!savedData;
-  const fields = Array.isArray(config.fields) ? config.fields : [];
+  const fields = useMemo(() => (Array.isArray(config.fields) ? config.fields : []), [config.fields]);
+  const hasSavedData = Boolean(savedData) && Object.keys(savedData || {}).length > 0;
 
   useEffect(() => {
     const { LMS_BASE_URL } = getConfig();
-    if (!LMS_BASE_URL || !config?.getApi) return;
+    if (!LMS_BASE_URL || !config?.getApi) {
+      return undefined;
+    }
 
+    let active = true;
     const loadSavedData = async () => {
       try {
         const client = getAuthenticatedHttpClient();
         const { data } = await client.get(`${LMS_BASE_URL}${config.getApi}`);
+        if (!active) return;
         setSavedData(Object.keys(data || {}).length ? data : null);
-      } catch (err) {
-        console.error(`Failed to load ${config.getApi}:`, err);
+        setStatusMessage({ type: '', message: '' });
+      } catch (error) {
+        if (!active) return;
         setSavedData(null);
+        setStatusMessage({
+          type: 'danger',
+          message: getErrorMessage(error) || formatMessage(messages['Extended.Profile.Information.section.load.error']),
+        });
       }
     };
 
     loadSavedData();
-  }, [config?.getApi, isSaving]);
+    return () => { active = false; };
+  }, [config?.getApi, formatMessage, isSaving]);
 
   useEffect(() => {
-    if (hasSavedData) {
-      setFormData(savedToForm(savedData, fields));
-    } else {
-      setFormData(initFormData(fields));
+    const initialData = hasSavedData
+      ? mapSavedToFormData(savedData, fields)
+      : initializeFormData(fields);
+    setFormData(initialData);
+  }, [savedData, hasSavedData, fields]);
+
+  const evaluateCondition = (condition) => {
+    if (!condition) {
+      return true;
     }
-  }, [savedData, fields]);
-
-  const initFormData = (fields) => {
-    const data = {};
-    fields.forEach((f) => {
-      if (f.type === 'multiselect' || f.type === 'checkbox') data[f.name] = [];
-      else if (f.type === 'file') data[f.name] = null;
-      else data[f.name] = '';
-      if (f.customOption) data[f.customFieldName] = '';
-    });
-    return data;
+    return formData[condition.field] === condition.value;
   };
 
-  const savedToForm = (saved, fields) => {
-    const data = initFormData(fields);
-    fields.forEach((f) => {
-      let val = saved?.[f.name];
-      if (f.customOption) {
-        const opts = getOptions(f, data[f.dependsOn || '']);
-        if (opts && !opts.includes(val) && val) {
-          data[f.name] = 'Others';
-          data[f.customFieldName] = val;
-        } else {
-          data[f.name] = val || '';
-        }
-      } else if (f.type === 'multiselect' || f.type === 'checkbox') {
-        data[f.name] = Array.isArray(val) ? val : [];
-      } else if (f.type === 'file') {
-        data[f.name] = null;
-      } else {
-        data[f.name] = val || '';
-      }
-    });
-    return data;
-  };
+  const isFieldVisible = (field) => !field.visibleWhen || evaluateCondition(field.visibleWhen);
 
   const getOptions = (field, parentValue = '') => {
-    if (Array.isArray(field.options)) return field.options;
-    if (parentValue && field.options?.[parentValue]) return field.options[parentValue];
+    if (Array.isArray(field.options)) {
+      return field.options;
+    }
+    if (parentValue && field.options?.[parentValue]) {
+      return field.options[parentValue];
+    }
     return [];
   };
 
-  const resetDependents = (fieldName, newData) => {
-    const dependents = fields.filter((f) => f.dependsOn === fieldName);
-    dependents.forEach((d) => {
-      newData[d.name] = d.type === 'multiselect' || d.type === 'checkbox' ? [] : (d.type === 'file' ? null : '');
-      if (d.customOption) newData[d.customFieldName] = '';
-      resetDependents(d.name, newData);
-    });
+  const resetDependents = (fieldName, nextData) => {
+    fields
+      .filter((field) => field.dependsOn === fieldName)
+      .forEach((dependentField) => {
+        if (dependentField.type === 'multiselect' || dependentField.type === 'checkbox') {
+          nextData[dependentField.name] = [];
+        } else if (dependentField.type === 'file') {
+          nextData[dependentField.name] = null;
+        } else {
+          nextData[dependentField.name] = '';
+        }
+        if (dependentField.customOption && dependentField.customFieldName) {
+          nextData[dependentField.customFieldName] = '';
+        }
+        resetDependents(dependentField.name, nextData);
+      });
   };
 
-  const toggleAccordion = () => setIsOpen((p) => !p);
-
-  const handleChange = (e, name, field) => {
-    let value;
-    if (field.type === 'file') {
-      value = e.target.files[0] || null;
-    } else if (field.type === 'checkbox') {
-      value = formData[name] || [];
-      if (e.target.checked) {
-        value = [...value, e.target.value];
-      } else {
-        value = value.filter((v) => v !== e.target.value);
+  const updateFieldValue = (fieldName, value, field, shouldResetDependents = true) => {
+    setFormData((previous) => {
+      const nextData = {
+        ...previous,
+        [fieldName]: value,
+      };
+      if (shouldResetDependents) {
+        resetDependents(fieldName, nextData);
       }
-    } else if (field.type === 'radio') {
-      value = e.target.value;
-    } else {
-      value = e.target.value;
-    }
-
-    setFormData((prev) => {
-      const newData = { ...prev, [name]: value };
-      resetDependents(name, newData);
-      return newData;
+      return nextData;
     });
-    setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
 
-  const handleMultiSelect = (fieldName, opt) => {
-    setFormData((prev) => {
-      const arr = prev[fieldName] || [];
-      return { ...prev, [fieldName]: arr.includes(opt) ? arr.filter(v => v !== opt) : [...arr, opt] };
-    });
-  };
-
-  const removeMulti = (fieldName, val) => {
-    setFormData(prev => ({ ...prev, [fieldName]: prev[fieldName].filter(v => v !== val) }));
-  };
-
-  const toggleMultiDropdown = (fieldName) => setMultiOpen(p => ({ ...p, [fieldName]: !p[fieldName] }));
-
-  const prepareFormData = () => {
-  const payload = {};
-
-  fields.forEach((f) => {
-    const value = formData[f.name];
-
-    if (f.customOption && value === 'Others') {
-      payload[f.name] = formData[f.customFieldName] || '';
-    } else {
-      // arrays stay arrays, null/undefined → '', scalars stay as-is
-      payload[f.name] = value ?? '';
+    if (field?.name) {
+      setErrors((previous) => ({ ...previous, [field.name]: '' }));
     }
-  });
+    setStatusMessage({ type: '', message: '' });
+  };
 
-  return payload;
-};
+  const preparePayload = () => {
+    const payload = {};
+    fields.forEach((field) => {
+      const fieldValue = formData[field.name];
+      if (field.customOption && fieldValue === 'Others') {
+        payload[field.name] = formData[field.customFieldName] || '';
+      } else {
+        payload[field.name] = fieldValue ?? '';
+      }
+    });
+    return payload;
+  };
 
   const validateField = (field, value) => {
-    if (field.visibleWhen && !evaluateCondition(field.visibleWhen)) return '';
-
-    const isRequired = field.required || (field.requiredWhen && evaluateCondition(field.requiredWhen));
-    if (isRequired && (!value || (Array.isArray(value) && !value.length))) {
-      return `${field.label.replace('*', '').trim()} is required`;
+    if (!isFieldVisible(field)) {
+      return '';
     }
 
-    if (field.validation) {
-      const val = field.validation;
-      if (val.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        return 'Invalid email';
-      }
-      if (val.minLength && String(value).length < val.minLength) {
-        return `Minimum length ${val.minLength}`;
-      }
-      if (val.maxLength && String(value).length > val.maxLength) {
-        return `Maximum length ${val.maxLength}`;
-      }
-      if (val.min && Number(value) < val.min) return `Minimum value ${val.min}`;
-      if (val.max && Number(value) > val.max) return `Maximum value ${val.max}`;
-      if (val.pattern && value && !new RegExp(val.pattern).test(value)) {
-        return 'Invalid format';
-      }
+    const isRequired = field.required || (field.requiredWhen && evaluateCondition(field.requiredWhen));
+    if (isRequired && (!value || (Array.isArray(value) && value.length === 0))) {
+      return `${field.label.replace('*', '').trim()} ${formatMessage(messages['Extended.Profile.Information.required.suffix'])}`;
+    }
+
+    if (!field.validation) {
+      return '';
+    }
+
+    const { validation } = field;
+    if (validation.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      return formatMessage(messages['Extended.Profile.Information.validation.invalid.email']);
+    }
+    if (validation.minLength && String(value).length < validation.minLength) {
+      return formatMessage(messages['Extended.Profile.Information.validation.min.length'], { minLength: validation.minLength });
+    }
+    if (validation.maxLength && String(value).length > validation.maxLength) {
+      return formatMessage(messages['Extended.Profile.Information.validation.max.length'], { maxLength: validation.maxLength });
+    }
+    if (validation.min && Number(value) < validation.min) {
+      return formatMessage(messages['Extended.Profile.Information.validation.min.value'], { min: validation.min });
+    }
+    if (validation.max && Number(value) > validation.max) {
+      return formatMessage(messages['Extended.Profile.Information.validation.max.value'], { max: validation.max });
+    }
+    if (validation.pattern && value && !new RegExp(validation.pattern).test(value)) {
+      return formatMessage(messages['Extended.Profile.Information.validation.invalid.format']);
     }
     return '';
   };
 
-  const evaluateCondition = (cond) => {
-    if (!cond) return true;
-    return formData[cond.field] === cond.value;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setIsSaving(true);
 
-    const newErrors = {};
-    fields.forEach((f) => {
-      const err = validateField(f, formData[f.name]);
-      if (err) newErrors[f.name] = err;
+    const nextErrors = {};
+    fields.forEach((field) => {
+      const validationError = validateField(field, formData[field.name]);
+      if (validationError) {
+        nextErrors[field.name] = validationError;
+      }
     });
-    setErrors(newErrors);
+    setErrors(nextErrors);
 
-    if (Object.keys(newErrors).length > 0) {
+    if (Object.keys(nextErrors).length > 0) {
       setIsSaving(false);
       return;
     }
@@ -257,262 +269,349 @@ const GenericSection = ({ config }) => {
     try {
       const { LMS_BASE_URL } = getConfig();
       const client = getAuthenticatedHttpClient();
-
-      await client.post(`${LMS_BASE_URL}${config.saveApi}`, prepareFormData());
-
-      // Notify other components that profile data changed → progress should refresh
-      emitProfileEvent(PROFILE_EVENTS.PROGRESS_SHOULD_REFRESH);
-
-      // setSavedData({ ...formData });
+      const response = await client.post(`${LMS_BASE_URL}${config.saveApi}`, preparePayload());
+      setStatusMessage({
+        type: 'success',
+        message: getBackendMessage(response?.data)
+          || formatMessage(messages['Extended.Profile.Information.save.success']),
+      });
       setIsEditing(false);
-    } catch (err) {
-      console.error('Save failed:', err);
+      emitProfileEvent(PROFILE_EVENTS.PROGRESS_SHOULD_REFRESH);
+    } catch (error) {
+      setStatusMessage({
+        type: 'danger',
+        message: getErrorMessage(error)
+          || formatMessage(messages['Extended.Profile.Information.save.error']),
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    setFormData(savedToForm(savedData, fields));
-    setIsEditing(false);
+    setFormData(mapSavedToFormData(savedData, fields));
     setErrors({});
+    setStatusMessage({ type: '', message: '' });
+    setIsEditing(false);
   };
 
-  const handleEdit = () => setIsEditing(true);
-
-  const isFieldVisible = (field) => !field.visibleWhen || evaluateCondition(field.visibleWhen);
-
   const renderField = (field) => {
-    if (!isFieldVisible(field)) return null;
+    if (!isFieldVisible(field)) {
+      return null;
+    }
 
     const value = formData[field.name];
-    const parentVal = field.dependsOn ? formData[field.dependsOn] : '';
-    const options = getOptions(field, parentVal);
-    const showCustom = field.customOption && value === 'Others';
+    const parentValue = field.dependsOn ? formData[field.dependsOn] : '';
+    const options = getOptions(field, parentValue);
+    const showCustomInput = field.customOption && value === 'Others' && field.customFieldName;
     const helper = field.helper || '';
     const error = errors[field.name];
 
-    const commonProps = {
-      isInvalid: !!error,
-    };
-
-    switch (field.type) {
-      case 'select':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label htmlFor={field.name} className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
+    if (field.type === 'select') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          <CustomSearchDropdown
+            id={field.name}
+            options={options}
+            value={value}
+            placeholder={field.placeholder || formatMessage(messages['Extended.Profile.Information.select.placeholder'])}
+            isInvalid={Boolean(error)}
+            onChange={(selectedValue) => updateFieldValue(field.name, selectedValue, field)}
+          />
+          {showCustomInput && (
             <Form.Control
-              as="select"
-              value={value}
-              onChange={e => handleChange(e, field.name, field)}
-            >
-              <option value="">{field.placeholder || 'Select'}</option>
-              {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </Form.Control>
-            {showCustom && (
-              <Form.Control
-                className="mt-2"
-                placeholder={`Enter custom ${field.label.toLowerCase().replace('*', '').trim()}`}
-                value={formData[field.customFieldName] || ''}
-                onChange={e => handleChange(e, field.customFieldName, field)}
-              />
-            )}
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'text': case 'tel': case 'email': case 'number': case 'date':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label htmlFor={field.name} className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            <Form.Control
-              type={field.type === 'email' ? 'email' : (field.type === 'number' ? 'number' : field.type)}
-              placeholder={field.placeholder || ''}
-              value={value}
-              onChange={e => handleChange(e, field.name, field)}
-              min={field.validation?.min}
-              max={field.validation?.max}
+              className="mt-2"
+              value={formData[field.customFieldName] || ''}
+              placeholder={formatMessage(messages['Extended.Profile.Information.custom.placeholder'], {
+                fieldLabel: field.label.toLowerCase().replace('*', '').trim(),
+              })}
+              onChange={(event) => updateFieldValue(field.customFieldName, event.target.value, field, false)}
             />
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'textarea':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label htmlFor={field.name} className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            <Form.Control
-              as="textarea"
-              rows={field.rows || 3}
-              placeholder={field.placeholder || ''}
-              value={value}
-              onChange={e => handleChange(e, field.name, field)}
-            />
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'multiselect':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label htmlFor={field.name} className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            <div className="d-flex flex-wrap gap-3 mb-3">
-              {(value || []).map(val => (
-                <span key={val} className="badge bg-primary text-white d-flex align-items-center m-1">
-                  {val}
-                  <Button variant="white" size="sm" className="p-0 ms-1 text-white m-1" onClick={() => removeMulti(field.name, val)}>
-                    <FontAwesomeIcon icon={faClose} className="text-white" />
-                  </Button>
-                </span>
-              ))}
-            </div>
-            <div className="position-relative multi-select-container">
-              <div
-                className="form-control d-flex justify-content-between align-items-center cursor-pointer"
-                onClick={() => toggleMultiDropdown(field.name)}
-              >
-                <span className={value?.length ? 'multi-select-text' : 'text-muted '}>
-                  {value?.length ? value.join(', ') : (field.placeholder || 'Select options')}
-                </span>
-                <FontAwesomeIcon icon={multiOpen[field.name] ? faChevronUp : faChevronDown} className="multi-select-bold-icon" />
-              </div>
-              {multiOpen[field.name] && (
-                <div className="multi-select-dropdown shadow-sm">
-                  {options.map(opt => (
-                    <div
-                      key={opt}
-                      className="dropdown-item d-flex align-items-center"
-                      onClick={() => handleMultiSelect(field.name, opt)}
-                    >
-                      <input type="checkbox" checked={value.includes(opt)} readOnly className="me-2 mr-2" />
-                      <span>{opt}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'radio':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            <Form.RadioSet
-              name={field.name}
-              onChange={e => handleChange(e, field.name, field)}
-              value={value}
-            >
-              {options.map(opt => (
-                <Form.Radio key={opt} value={opt}>{opt}</Form.Radio>
-              ))}
-            </Form.RadioSet>
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'checkbox':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            {options.map(opt => (
-              <Form.Checkbox
-                key={opt}
-                value={opt}
-                checked={(value || []).includes(opt)}
-                onChange={e => handleChange(e, field.name, field)}
-              >
-                {opt}
-              </Form.Checkbox>
-            ))}
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      case 'file':
-        return (
-          <Form.Group controlId={field.name} className="mb-4" {...commonProps}>
-            <label htmlFor={field.name} className="d-block">{field.label}</label>
-            {helper && <p className="small text-muted mb-2">{helper}</p>}
-            <Form.Control
-              type="file"
-              accept={field.accept}
-              onChange={e => handleChange(e, field.name, field)}
-            />
-            {value && <p className="mt-2">Selected: {value.name}</p>}
-            {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-          </Form.Group>
-        );
-
-      default: return null;
+          )}
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
     }
-  };
 
-  const renderForm = () => (
-    <Form onSubmit={handleSubmit} className="p-4">
-      <div className="row">
-        {fields.map((f, i) => (
-          <div key={i} className="col-md-6 mb-4">
-            {renderField(f)}
-          </div>
-        ))}
-      </div>
-      <div className="d-flex justify-content-end information-form-actions-buttons">
-        <Button variant="outline-secondary" onClick={handleCancel} className="information-form-actions-buttons-cancel">
-          {config.cancelText}
-        </Button>
-        <StatefulButton
-          state={isSaving ? 'pending' : 'default'}
-          labels={{ default: config.saveText, pending: 'Saving...' }}
-          type="submit"
-          className="information-form-actions-buttons-save"
-        />
-      </div>
-    </Form>
-  );
+    if (field.type === 'multiselect') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          <CustomSearchDropdown
+            id={field.name}
+            options={options}
+            value={Array.isArray(value) ? value : []}
+            multiple
+            isInvalid={Boolean(error)}
+            placeholder={field.placeholder || ''}
+            onChange={(selectedValues) => updateFieldValue(field.name, selectedValues, field)}
+          />
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
+    }
 
-  const renderDisplayMode = () => (
-    <div className="p-4">
-      <div className="row">
-        {fields.map((f, i) => (
-          <div key={i} className="col-6 mb-3">
-            <strong>{f.label.replace('*', '').trim()}</strong>
-            <p className="mb-0">
-              {Array.isArray(savedData?.[f.name])
-                ? savedData[f.name].join(', ') || '-'
-                : (f.type === 'file' ? savedData?.[f.name] || '-' : savedData?.[f.name] || '-')}
+    if (field.type === 'textarea') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          <Form.Control
+            as="textarea"
+            rows={field.rows || 3}
+            value={value}
+            placeholder={field.placeholder || ''}
+            onChange={(event) => updateFieldValue(field.name, event.target.value, field)}
+          />
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
+    }
+
+    if (field.type === 'radio') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          <Form.RadioSet
+            name={field.name}
+            value={value}
+            onChange={(event) => updateFieldValue(field.name, event.target.value, field)}
+          >
+            {options.map((option) => (
+              <Form.Radio key={option} value={option}>{option}</Form.Radio>
+            ))}
+          </Form.RadioSet>
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
+    }
+
+    if (field.type === 'checkbox') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          {options.map((option) => {
+            const checkedOptions = Array.isArray(value) ? value : [];
+            const isChecked = checkedOptions.includes(option);
+            const nextValue = isChecked
+              ? checkedOptions.filter((selectedValue) => selectedValue !== option)
+              : [...checkedOptions, option];
+
+            return (
+              <Form.Checkbox
+                key={option}
+                value={option}
+                checked={isChecked}
+                onChange={() => updateFieldValue(field.name, nextValue, field)}
+              >
+                {option}
+              </Form.Checkbox>
+            );
+          })}
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
+    }
+
+    if (field.type === 'file') {
+      return (
+        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          {helper && <p className="small text-muted mb-2">{helper}</p>}
+          <Form.Control
+            type="file"
+            accept={field.accept}
+            onChange={(event) => updateFieldValue(field.name, event.target.files?.[0] || null, field)}
+          />
+          {value?.name && (
+            <p className="small text-muted mt-2 mb-0">
+              {formatMessage(messages['Extended.Profile.Information.selected.file'], { fileName: value.name })}
             </p>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 d-flex justify-content-end information-form-actions-buttons">
-        <Button variant="outline-primary" className="information-form-button-edit" onClick={handleEdit}>
-          {config.editText}
-        </Button>
-      </div>
-    </div>
-  );
+          )}
+          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+        </Form.Group>
+      );
+    }
+
+    const isNumber = field.type === 'number';
+    const inputType = field.type === 'email' ? 'email' : (isNumber ? 'number' : field.type);
+    return (
+      <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
+        <label htmlFor={field.name} className="d-block">{field.label}</label>
+        {helper && <p className="small text-muted mb-2">{helper}</p>}
+        <Form.Control
+          type={inputType}
+          value={value}
+          placeholder={field.placeholder || ''}
+          min={field.validation?.min}
+          max={field.validation?.max}
+          onChange={(event) => updateFieldValue(field.name, event.target.value, field)}
+        />
+        {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
+      </Form.Group>
+    );
+  };
 
   return (
     <div className={`compnent-card-container ${isOpen ? 'open' : ''}`}>
-      <div className="header d-flex align-items-center justify-content-between p-4" onClick={toggleAccordion}>
+      <button
+        type="button"
+        className="header d-flex align-items-center justify-content-between p-4"
+        onClick={() => setIsOpen((previous) => !previous)}
+      >
         <h5 className="mb-0">{config.title}</h5>
         <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} />
-      </div>
+      </button>
+
       {isOpen && (
         <div className="content">
-          {isEditing || !hasSavedData ? renderForm() : renderDisplayMode()}
+          {statusMessage.message && (
+            <Alert variant={statusMessage.type} dismissible={false} show className="m-4 mb-0">
+              {statusMessage.message}
+            </Alert>
+          )}
+
+          {isEditing || !hasSavedData ? (
+            <Form onSubmit={handleSubmit} className="p-4">
+              <div className="row">
+                {fields.map((field) => (
+                  <div key={field.name} className="col-md-6 mb-2">
+                    {renderField(field)}
+                  </div>
+                ))}
+              </div>
+              <div className="d-flex justify-content-end information-form-actions-buttons">
+                <Button
+                  variant="outline-secondary"
+                  onClick={handleCancel}
+                  className="information-form-actions-buttons-cancel"
+                >
+                  {config.cancelText}
+                </Button>
+                <StatefulButton
+                  state={isSaving ? 'pending' : 'default'}
+                  labels={{
+                    default: config.saveText,
+                    pending: formatMessage(messages['Extended.Profile.Information.save.pending']),
+                  }}
+                  type="submit"
+                  className="information-form-actions-buttons-save"
+                />
+              </div>
+            </Form>
+          ) : (
+            <div className="p-4">
+              <div className="row">
+                {fields.map((field) => (
+                  <div key={field.name} className="col-6 mb-3">
+                    <strong>{field.label.replace('*', '').trim()}</strong>
+                    <p className="mb-0">
+                      {Array.isArray(savedData?.[field.name])
+                        ? savedData[field.name].join(', ') || formatMessage(messages['Extended.Profile.Information.empty.value'])
+                        : savedData?.[field.name] || formatMessage(messages['Extended.Profile.Information.empty.value'])}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 d-flex justify-content-end information-form-actions-buttons">
+                <Button
+                  variant="outline-primary"
+                  className="information-form-button-edit"
+                  onClick={() => {
+                    setStatusMessage({ type: '', message: '' });
+                    setIsEditing(true);
+                  }}
+                >
+                  <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="mr-1 text-primary"
+                  >
+                    <path
+                      d="m14.06 9.02.92.92L5.92 19H5v-.92l9.06-9.06ZM17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 0 0 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29Zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75Z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                  {config.editText}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
+};
+
+const initializeFormData = (fields) => {
+  const data = {};
+  fields.forEach((field) => {
+    if (field.type === 'multiselect' || field.type === 'checkbox') {
+      data[field.name] = [];
+    } else if (field.type === 'file') {
+      data[field.name] = null;
+    } else {
+      data[field.name] = '';
+    }
+    if (field.customOption && field.customFieldName) {
+      data[field.customFieldName] = '';
+    }
+  });
+  return data;
+};
+
+const mapSavedToFormData = (savedData, fields) => {
+  const data = initializeFormData(fields);
+
+  fields.forEach((field) => {
+    const value = savedData?.[field.name];
+    if (field.customOption && field.customFieldName) {
+      const options = Array.isArray(field.options) ? field.options : [];
+      const optionValues = options.map((option) => resolveOptionValue(option)).filter(Boolean);
+      if (value && !optionValues.includes(value)) {
+        data[field.name] = 'Others';
+        data[field.customFieldName] = value;
+      } else {
+        data[field.name] = value || '';
+      }
+      return;
+    }
+
+    if (field.type === 'multiselect' || field.type === 'checkbox') {
+      data[field.name] = Array.isArray(value) ? value : [];
+      return;
+    }
+
+    if (field.type === 'file') {
+      data[field.name] = null;
+      return;
+    }
+
+    data[field.name] = value || '';
+  });
+
+  return data;
+};
+
+GenericSection.propTypes = {
+  config: PropTypes.shape({
+    title: PropTypes.string,
+    fields: PropTypes.arrayOf(PropTypes.shape({})),
+    getApi: PropTypes.string,
+    saveApi: PropTypes.string,
+    defaultOpen: PropTypes.bool,
+    cancelText: PropTypes.string,
+    saveText: PropTypes.string,
+    editText: PropTypes.string,
+  }).isRequired,
 };
 
 export default CustomExtendedProfileInformation;

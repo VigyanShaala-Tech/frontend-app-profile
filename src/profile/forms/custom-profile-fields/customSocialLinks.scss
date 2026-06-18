@@ -1,0 +1,17 @@
+.custom-social-links__list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.custom-social-platform-heading__content {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.custom-social-platform-heading__icon {
+  color: var(--primary);
+  font-size: 20px;
+  line-height: 1;
+}
