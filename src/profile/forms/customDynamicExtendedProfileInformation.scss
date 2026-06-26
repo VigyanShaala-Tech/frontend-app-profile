@@ -88,7 +88,16 @@
   line-height: 20px;
   padding: 7px 13px;
 }
-
+.information-form-actions-buttons .information-form-button-edit:hover .text-primary,
+.information-form-actions-buttons .information-form-button-edit:focus .text-primary{
+  color: #ffffff !important;
+}
+.compnent-card-container textarea.form-control{
+  min-height: 100px;
+}
+.compnent-card-container .pgn__form-group .pgn__form-text-invalid {
+  font-size: 12px;
+}
 .information-form-actions-buttons .information-form-actions-buttons-save {
   font-size: 14px;
   font-weight: 500;

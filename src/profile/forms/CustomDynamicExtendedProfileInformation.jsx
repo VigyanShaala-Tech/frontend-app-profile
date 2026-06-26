@@ -29,6 +29,65 @@ const getBackendMessage = (payload) => payload?.message
 
 const getErrorMessage = (error) => getBackendMessage(error?.response?.data);
 
+// ---------------------------------------------------------------------------
+// Eligibility rule evaluation (mirrors server-side _evaluate_rule in Python)
+// ---------------------------------------------------------------------------
+
+const ELIGIBILITY_DYNAMIC_TODAY = '__today__';
+
+const isDateString = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v));
+
+const compareValuesForRule = (a, b) => {
+  if (isDateString(a) && isDateString(b)) {
+    return new Date(a) - new Date(b);
+  }
+  const fa = parseFloat(a);
+  const fb = parseFloat(b);
+  if (!Number.isNaN(fa) && !Number.isNaN(fb)) {
+    return fa - fb;
+  }
+  const sa = String(a).toLowerCase();
+  const sb = String(b).toLowerCase();
+  // eslint-disable-next-line no-nested-ternary
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+};
+
+const resolveExpectedValue = (v) => (v === ELIGIBILITY_DYNAMIC_TODAY
+  ? new Date().toISOString().split('T')[0]
+  : v);
+
+const evaluateEligibilityRule = (operator, value, expected) => {
+  const resolved = Array.isArray(expected)
+    ? expected.map(resolveExpectedValue)
+    : resolveExpectedValue(expected);
+  const valStr = String(value).toLowerCase();
+
+  switch (operator) {
+    case 'eq':
+      return valStr === String(resolved).toLowerCase();
+    case 'ne':
+      return valStr !== String(resolved).toLowerCase();
+    case 'in': {
+      const lst = Array.isArray(resolved) ? resolved : [resolved];
+      return lst.map((x) => String(x).toLowerCase()).includes(valStr);
+    }
+    case 'not_in': {
+      const lst = Array.isArray(resolved) ? resolved : [resolved];
+      return !lst.map((x) => String(x).toLowerCase()).includes(valStr);
+    }
+    case 'gte':
+      return compareValuesForRule(value, resolved) >= 0;
+    case 'lte':
+      return compareValuesForRule(value, resolved) <= 0;
+    case 'gt':
+      return compareValuesForRule(value, resolved) > 0;
+    case 'lt':
+      return compareValuesForRule(value, resolved) < 0;
+    default:
+      return true;
+  }
+};
+
 const resolveOptionValue = (option) => {
   if (typeof option === 'string') {
     return option;
@@ -286,6 +345,16 @@ const GenericSection = ({ config }) => {
     if (validation.pattern && value && !new RegExp(validation.pattern).test(value)) {
       return formatMessage(messages['Extended.Profile.Information.validation.invalid.format']);
     }
+
+    // Eligibility rules — only checked when a value is present
+    if (value && field.eligibilityRules && field.eligibilityRules.length > 0) {
+      for (const rule of field.eligibilityRules) {
+        if (!evaluateEligibilityRule(rule.operator, value, rule.expectedValue)) {
+          return rule.message;
+        }
+      }
+    }
+
     return '';
   };
 
@@ -319,6 +388,10 @@ const GenericSection = ({ config }) => {
       setIsEditing(false);
       emitProfileEvent(PROFILE_EVENTS.PROGRESS_SHOULD_REFRESH);
     } catch (error) {
+      const errData = error?.response?.data;
+      if (errData?.fieldErrors && typeof errData.fieldErrors === 'object') {
+        setErrors(errData.fieldErrors);
+      }
       setStatusMessage({
         type: 'danger',
         message: getErrorMessage(error)
@@ -343,6 +416,15 @@ const GenericSection = ({ config }) => {
       return value.join(', ') || formatMessage(messages['Extended.Profile.Information.empty.value']);
     }
     return value || formatMessage(messages['Extended.Profile.Information.empty.value']);
+  };
+
+  // Returns the display label for a field, appending * for required editable fields
+  const fieldLabel = (field) => {
+    const clean = field.label.replace('*', '').trim();
+    if (!field.readOnly && field.required) {
+      return <>{clean} <span className="text-danger" aria-hidden="true">*</span></>;
+    }
+    return clean;
   };
 
   const renderField = (field) => {
@@ -371,7 +453,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'select') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <CustomSearchDropdown
             id={field.name}
@@ -399,7 +481,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'multiselect') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <CustomSearchDropdown
             id={field.name}
@@ -418,11 +500,11 @@ const GenericSection = ({ config }) => {
     if (field.type === 'textarea') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.Control
             as="textarea"
-            rows={field.rows || 3}
+            rows={field.rows || 5}
             value={value}
             placeholder={field.placeholder || ''}
             onChange={(event) => updateFieldValue(field.name, event.target.value, field)}
@@ -435,7 +517,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'radio') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label className="d-block">{field.label}</label>
+          <label className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.RadioSet
             name={field.name}
@@ -454,7 +536,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'checkbox') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label className="d-block">{field.label}</label>
+          <label className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           {options.map((option) => {
             const checkedOptions = Array.isArray(value) ? value : [];
@@ -482,7 +564,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'file') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.Control
             type="file"
@@ -503,7 +585,7 @@ const GenericSection = ({ config }) => {
     const inputType = field.type === 'email' ? 'email' : (isNumber ? 'number' : field.type);
     return (
       <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-        <label htmlFor={field.name} className="d-block">{field.label}</label>
+        <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
         {helper && <p className="small text-muted mb-2">{helper}</p>}
         <Form.Control
           type={inputType}
