@@ -29,6 +29,65 @@ const getBackendMessage = (payload) => payload?.message
 
 const getErrorMessage = (error) => getBackendMessage(error?.response?.data);
 
+// ---------------------------------------------------------------------------
+// Eligibility rule evaluation (mirrors server-side _evaluate_rule in Python)
+// ---------------------------------------------------------------------------
+
+const ELIGIBILITY_DYNAMIC_TODAY = '__today__';
+
+const isDateString = (v) => /^\d{4}-\d{2}-\d{2}/.test(String(v));
+
+const compareValuesForRule = (a, b) => {
+  if (isDateString(a) && isDateString(b)) {
+    return new Date(a) - new Date(b);
+  }
+  const fa = parseFloat(a);
+  const fb = parseFloat(b);
+  if (!Number.isNaN(fa) && !Number.isNaN(fb)) {
+    return fa - fb;
+  }
+  const sa = String(a).toLowerCase();
+  const sb = String(b).toLowerCase();
+  // eslint-disable-next-line no-nested-ternary
+  return sa < sb ? -1 : sa > sb ? 1 : 0;
+};
+
+const resolveExpectedValue = (v) => (v === ELIGIBILITY_DYNAMIC_TODAY
+  ? new Date().toISOString().split('T')[0]
+  : v);
+
+const evaluateEligibilityRule = (operator, value, expected) => {
+  const resolved = Array.isArray(expected)
+    ? expected.map(resolveExpectedValue)
+    : resolveExpectedValue(expected);
+  const valStr = String(value).toLowerCase();
+
+  switch (operator) {
+    case 'eq':
+      return valStr === String(resolved).toLowerCase();
+    case 'ne':
+      return valStr !== String(resolved).toLowerCase();
+    case 'in': {
+      const lst = Array.isArray(resolved) ? resolved : [resolved];
+      return lst.map((x) => String(x).toLowerCase()).includes(valStr);
+    }
+    case 'not_in': {
+      const lst = Array.isArray(resolved) ? resolved : [resolved];
+      return !lst.map((x) => String(x).toLowerCase()).includes(valStr);
+    }
+    case 'gte':
+      return compareValuesForRule(value, resolved) >= 0;
+    case 'lte':
+      return compareValuesForRule(value, resolved) <= 0;
+    case 'gt':
+      return compareValuesForRule(value, resolved) > 0;
+    case 'lt':
+      return compareValuesForRule(value, resolved) < 0;
+    default:
+      return true;
+  }
+};
+
 const resolveOptionValue = (option) => {
   if (typeof option === 'string') {
     return option;
@@ -105,9 +164,14 @@ const GenericSection = ({ config }) => {
   const [savedData, setSavedData] = useState(null);
   const [errors, setErrors] = useState({});
   const [statusMessage, setStatusMessage] = useState({ type: '', message: '' });
+  // Options loaded dynamically via optionsApi when parent dropdown changes
+  const [dynamicOptions, setDynamicOptions] = useState({});
 
   const fields = useMemo(() => (Array.isArray(config.fields) ? config.fields : []), [config.fields]);
   const hasSavedData = Boolean(savedData) && Object.keys(savedData || {}).length > 0;
+
+  // Section is read-only when no saveApi is provided (all fields are display-only)
+  const isReadOnlySection = !config.saveApi;
 
   useEffect(() => {
     const { LMS_BASE_URL } = getConfig();
@@ -154,6 +218,10 @@ const GenericSection = ({ config }) => {
   const isFieldVisible = (field) => !field.visibleWhen || evaluateCondition(field.visibleWhen);
 
   const getOptions = (field, parentValue = '') => {
+    // Dynamic options loaded via optionsApi take priority
+    if (dynamicOptions[field.name] !== undefined) {
+      return dynamicOptions[field.name];
+    }
     if (Array.isArray(field.options)) {
       return field.options;
     }
@@ -197,11 +265,39 @@ const GenericSection = ({ config }) => {
       setErrors((previous) => ({ ...previous, [field.name]: '' }));
     }
     setStatusMessage({ type: '', message: '' });
+
+    // Reload child dropdown options when a parent field changes (optionsApi cascading)
+    if (shouldResetDependents) {
+      const dependentCascadeFields = fields.filter(
+        (f) => f.dependsOn === fieldName && f.optionsApi && f.fieldId,
+      );
+      if (dependentCascadeFields.length > 0) {
+        const { LMS_BASE_URL } = getConfig();
+        const client = getAuthenticatedHttpClient();
+        dependentCascadeFields.forEach(async (childField) => {
+          let opts = [];
+          if (value) {
+            try {
+              const url = `${LMS_BASE_URL}${childField.optionsApi}?field_id=${childField.fieldId}&parent_value=${encodeURIComponent(String(value))}`;
+              const { data } = await client.get(url);
+              opts = Array.isArray(data) ? data : [];
+            } catch {
+              opts = [];
+            }
+          }
+          setDynamicOptions((prev) => ({ ...prev, [childField.name]: opts }));
+        });
+      }
+    }
   };
 
   const preparePayload = () => {
     const payload = {};
     fields.forEach((field) => {
+      // Skip read-only fields — the server enforces this too, but skip here to keep the payload clean
+      if (field.readOnly) {
+        return;
+      }
       const fieldValue = formData[field.name];
       if (field.customOption && fieldValue === 'Others') {
         payload[field.name] = formData[field.customFieldName] || '';
@@ -213,6 +309,10 @@ const GenericSection = ({ config }) => {
   };
 
   const validateField = (field, value) => {
+    // Read-only fields are never validated (user cannot change them)
+    if (field.readOnly) {
+      return '';
+    }
     if (!isFieldVisible(field)) {
       return '';
     }
@@ -245,6 +345,16 @@ const GenericSection = ({ config }) => {
     if (validation.pattern && value && !new RegExp(validation.pattern).test(value)) {
       return formatMessage(messages['Extended.Profile.Information.validation.invalid.format']);
     }
+
+    // Eligibility rules — only checked when a value is present
+    if (value && field.eligibilityRules && field.eligibilityRules.length > 0) {
+      for (const rule of field.eligibilityRules) {
+        if (!evaluateEligibilityRule(rule.operator, value, rule.expectedValue)) {
+          return rule.message;
+        }
+      }
+    }
+
     return '';
   };
 
@@ -278,6 +388,10 @@ const GenericSection = ({ config }) => {
       setIsEditing(false);
       emitProfileEvent(PROFILE_EVENTS.PROGRESS_SHOULD_REFRESH);
     } catch (error) {
+      const errData = error?.response?.data;
+      if (errData?.fieldErrors && typeof errData.fieldErrors === 'object') {
+        setErrors(errData.fieldErrors);
+      }
       setStatusMessage({
         type: 'danger',
         message: getErrorMessage(error)
@@ -292,7 +406,25 @@ const GenericSection = ({ config }) => {
     setFormData(mapSavedToFormData(savedData, fields));
     setErrors({});
     setStatusMessage({ type: '', message: '' });
+    // Reset dynamic options so field.options (pre-loaded for saved values) takes over
+    setDynamicOptions({});
     setIsEditing(false);
+  };
+
+  const renderFieldValue = (field, value) => {
+    if (Array.isArray(value)) {
+      return value.join(', ') || formatMessage(messages['Extended.Profile.Information.empty.value']);
+    }
+    return value || formatMessage(messages['Extended.Profile.Information.empty.value']);
+  };
+
+  // Returns the display label for a field, appending * for required editable fields
+  const fieldLabel = (field) => {
+    const clean = field.label.replace('*', '').trim();
+    if (!field.readOnly && field.required) {
+      return <>{clean} <span className="text-danger" aria-hidden="true">*</span></>;
+    }
+    return clean;
   };
 
   const renderField = (field) => {
@@ -301,6 +433,17 @@ const GenericSection = ({ config }) => {
     }
 
     const value = formData[field.name];
+
+    // Read-only field: render as static text even in edit mode
+    if (field.readOnly) {
+      return (
+        <Form.Group controlId={field.name} className="mb-4">
+          <label className="d-block font-weight-bold small text-muted">{field.label.replace('*', '').trim()}</label>
+          <p className="mb-0 text-dark">{renderFieldValue(field, value)}</p>
+        </Form.Group>
+      );
+    }
+
     const parentValue = field.dependsOn ? formData[field.dependsOn] : '';
     const options = getOptions(field, parentValue);
     const showCustomInput = field.customOption && value === 'Others' && field.customFieldName;
@@ -310,7 +453,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'select') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <CustomSearchDropdown
             id={field.name}
@@ -338,7 +481,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'multiselect') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <CustomSearchDropdown
             id={field.name}
@@ -357,11 +500,11 @@ const GenericSection = ({ config }) => {
     if (field.type === 'textarea') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.Control
             as="textarea"
-            rows={field.rows || 3}
+            rows={field.rows || 5}
             value={value}
             placeholder={field.placeholder || ''}
             onChange={(event) => updateFieldValue(field.name, event.target.value, field)}
@@ -374,7 +517,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'radio') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label className="d-block">{field.label}</label>
+          <label className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.RadioSet
             name={field.name}
@@ -393,7 +536,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'checkbox') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label className="d-block">{field.label}</label>
+          <label className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           {options.map((option) => {
             const checkedOptions = Array.isArray(value) ? value : [];
@@ -421,7 +564,7 @@ const GenericSection = ({ config }) => {
     if (field.type === 'file') {
       return (
         <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{field.label}</label>
+          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
           {helper && <p className="small text-muted mb-2">{helper}</p>}
           <Form.Control
             type="file"
@@ -442,7 +585,7 @@ const GenericSection = ({ config }) => {
     const inputType = field.type === 'email' ? 'email' : (isNumber ? 'number' : field.type);
     return (
       <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-        <label htmlFor={field.name} className="d-block">{field.label}</label>
+        <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
         {helper && <p className="small text-muted mb-2">{helper}</p>}
         <Form.Control
           type={inputType}
@@ -456,6 +599,11 @@ const GenericSection = ({ config }) => {
       </Form.Group>
     );
   };
+
+  // Determine whether to show the edit form:
+  //   - Never for read-only sections
+  //   - Show when actively editing OR when there's no saved data yet (first fill)
+  const showForm = !isReadOnlySection && (isEditing || !hasSavedData);
 
   return (
     <div className={`compnent-card-container ${isOpen ? 'open' : ''}`}>
@@ -476,7 +624,7 @@ const GenericSection = ({ config }) => {
             </Alert>
           )}
 
-          {isEditing || !hasSavedData ? (
+          {showForm ? (
             <Form onSubmit={handleSubmit} className="p-4">
               <div className="row">
                 {fields.map((field) => (
@@ -518,31 +666,33 @@ const GenericSection = ({ config }) => {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 d-flex justify-content-end information-form-actions-buttons">
-                <Button
-                  variant="outline-primary"
-                  className="information-form-button-edit"
-                  onClick={() => {
-                    setStatusMessage({ type: '', message: '' });
-                    setIsEditing(true);
-                  }}
-                >
-                  <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="mr-1 text-primary"
+              {!isReadOnlySection && (
+                <div className="mt-4 d-flex justify-content-end information-form-actions-buttons">
+                  <Button
+                    variant="outline-primary"
+                    className="information-form-button-edit"
+                    onClick={() => {
+                      setStatusMessage({ type: '', message: '' });
+                      setIsEditing(true);
+                    }}
                   >
-                    <path
-                      d="m14.06 9.02.92.92L5.92 19H5v-.92l9.06-9.06ZM17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 0 0 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29Zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75Z"
-                      fill="currentColor"
-                    />
-                  </svg>
-                  {config.editText}
-                </Button>
-              </div>
+                    <svg
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="mr-1 text-primary"
+                    >
+                      <path
+                        d="m14.06 9.02.92.92L5.92 19H5v-.92l9.06-9.06ZM17.66 3c-.25 0-.51.1-.7.29l-1.83 1.83 3.75 3.75 1.83-1.83a.996.996 0 0 0 0-1.41l-2.34-2.34c-.2-.2-.45-.29-.71-.29Zm-3.6 3.19L3 17.25V21h3.75L17.81 9.94l-3.75-3.75Z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                    {config.editText}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
