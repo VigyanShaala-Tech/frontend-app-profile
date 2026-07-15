@@ -21,6 +21,11 @@ const messages = defineMessages({
     defaultMessage: 'Upload photo',
     description: 'Tooltip for upload photo button',
   },
+  'profile.profileavatar.select-avatar-button': {
+    id: 'profile.profileavatar.select-avatar-button',
+    defaultMessage: 'Select Avatar',
+    description: 'Select avatar button',
+  },
 });
 
 export default messages;
