@@ -8,9 +8,6 @@
   --pgn-elevation-form-input-focus: 0 0 0 0.2rem rgba(105, 171, 74, 0.25);
 }
 
-/* Page-level horizontal padding for custom-page parent sections only
-   Matches frontend-app-public container padding by screen size:
-   desktop: 15px | tablet (<=991px): 1.5rem | mobile (<=576px): 1rem */
 .custom-profile-root > .custom-profile-main,
 .custom-profile-root > .custom-profile-layout,
 .custom-profile-root > .custom-extended-wrapper,
