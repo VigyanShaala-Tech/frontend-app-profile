@@ -99,10 +99,6 @@
 }
 
 @media (max-width: 1023px) {
-  .custom-extended-wrapper {
-    padding: 0 14px;
-  }
-
   .extended-profile-information__grid {
     grid-template-columns: 1fr;
   }
@@ -113,10 +109,6 @@
 }
 
 @media (max-width: 767px) {
-  .custom-extended-wrapper {
-    padding: 0 12px;
-  }
-
   .extended-profile-information {
     padding: 14px;
   }
