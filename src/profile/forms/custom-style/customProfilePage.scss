@@ -224,6 +224,16 @@
   white-space: nowrap;
 }
 
+.custom-certificate-row__action .btn {
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+.custom-certificate-row__action .btn:hover,
+.custom-certificate-row__action .btn:focus {
+  transform: scale(1.02);
+}
+
 /* Custom-page only: convert icon-only edit action into text button */
 .custom-profile-layout .custom-profile-card .btn.btn-link.btn-sm {
   align-items: center;
