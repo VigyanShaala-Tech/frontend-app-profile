@@ -40,3 +40,9 @@
   border-color: #d23228;
   box-shadow: none;
 }
+
+.custom-whatsapp-phone-input .react-international-phone-country-selector-dropdown__list-item:hover,
+.custom-whatsapp-phone-input .react-international-phone-country-selector-dropdown__list-item--focused,
+.custom-whatsapp-phone-input .react-international-phone-country-selector-dropdown__list-item--selected {
+  background-color: rgba(var(--primary-rgb), 0.12) !important;
+}

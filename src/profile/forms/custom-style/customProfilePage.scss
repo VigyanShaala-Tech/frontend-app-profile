@@ -346,7 +346,7 @@
 
 .custom-profile-layout .custom-profile-card .small.text-muted {
   align-items: center;
-  color: #64748b !important;
+  color: var(--primary) !important;
   display: inline-flex;
   font-size: 13px;
   gap: 6px;
@@ -354,7 +354,7 @@
 }
 
 .custom-profile-layout .custom-profile-card .small.text-muted svg {
-  color: #64748b;
+  color: var(--primary);
   height: 14px;
   width: 14px;
 }
