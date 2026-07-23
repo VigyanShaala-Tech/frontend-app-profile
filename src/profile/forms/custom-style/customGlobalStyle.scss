@@ -108,3 +108,26 @@
   border: 1px solid #d1d5db !important;
   color: var(--primary) !important;
 }
+
+/* Custom-page only: convert default blue links to brand primary */
+.custom-profile-root .custom-profile-card a:not(.btn),
+.custom-profile-root .custom-profile-certificates-section a:not(.btn),
+.custom-profile-root .custom-social-links__item a:not(.btn) {
+  color: var(--primary) !important;
+}
+
+.custom-profile-root .custom-profile-card a:not(.btn):hover,
+.custom-profile-root .custom-profile-card a:not(.btn):focus,
+.custom-profile-root .custom-profile-certificates-section a:not(.btn):hover,
+.custom-profile-root .custom-profile-certificates-section a:not(.btn):focus,
+.custom-profile-root .custom-social-links__item a:not(.btn):hover,
+.custom-profile-root .custom-social-links__item a:not(.btn):focus {
+  color: var(--primary-dark) !important;
+}
+
+/* Social link values and visibility labels on custom page */
+.custom-profile-root .custom-profile-card .custom-social-links__item .edit-section-header,
+.custom-profile-root .custom-profile-card .small.text-muted,
+.custom-profile-root .custom-profile-card .small.text-muted svg {
+  color: var(--primary) !important;
+}

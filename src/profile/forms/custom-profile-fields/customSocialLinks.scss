@@ -15,3 +15,15 @@
   font-size: 20px;
   line-height: 1;
 }
+
+.custom-social-link-value {
+  color: var(--primary) !important;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.custom-social-link-value:hover,
+.custom-social-link-value:focus {
+  color: var(--primary-dark) !important;
+  text-decoration: underline;
+}

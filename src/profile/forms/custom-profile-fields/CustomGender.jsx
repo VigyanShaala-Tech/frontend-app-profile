@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { connect } from 'react-redux';
-import { useDispatch } from 'react-redux';
+import { connect, useDispatch } from 'react-redux';
 import { getAuthenticatedUser } from '@edx/frontend-platform/auth';
 import { useIntl } from '@edx/frontend-platform/i18n';
 import get from 'lodash.get';
@@ -10,6 +9,7 @@ import { Form } from '@openedx/paragon';
 import messages from '../Gender.messages';
 import customMessages from './CustomGenderMock.messages';
 import CustomFormControls from '../custom-components/CustomFormControls';
+import CustomSearchDropdown from '../custom-components/CustomSearchDropdown';
 import EditableItemHeader from '../elements/EditableItemHeader';
 import EmptyContent from '../elements/EmptyContent';
 import SwitchContent from '../elements/SwitchContent';
@@ -28,12 +28,25 @@ const getCustomGenderLabelMessage = (value) => {
   if (value === 'o') {
     return messages['profile.gender.options.p'];
   }
-  const message = get(
+  return get(
     messages,
     `profile.gender.options.${value}`,
     null,
   );
-  return message;
+};
+
+const getBackendFieldError = (submitError, fieldName) => {
+  const fieldErrors = submitError?.processedData?.fieldErrors
+    || submitError?.response?.data?.field_errors
+    || submitError?.response?.data?.fieldErrors;
+  const fieldError = fieldErrors?.[fieldName];
+  if (!fieldError) {
+    return '';
+  }
+  if (typeof fieldError === 'string') {
+    return fieldError;
+  }
+  return fieldError.userMessage || fieldError.user_message || fieldError.developerMessage || fieldError.developer_message || '';
 };
 
 const CustomGender = ({
@@ -57,6 +70,11 @@ const CustomGender = ({
   const [committedVisibilityGender, setCommittedVisibilityGender] = useState(visibilityGender || 'private');
   const [localSaveState, setLocalSaveState] = useState(null);
   const [localError, setLocalError] = useState(null);
+
+  const genderOptions = useMemo(() => CUSTOM_GENDER_OPTIONS.map((option) => ({
+    value: option,
+    label: formatMessage(getCustomGenderLabelMessage(option)),
+  })), [formatMessage]);
 
   useEffect(() => {
     setCommittedGender(gender || '');
@@ -89,7 +107,13 @@ const CustomGender = ({
       dispatch(fetchProfile(username));
     } catch (submitError) {
       setLocalSaveState('error');
-      setLocalError(submitError?.processedData?.gender || submitError?.response?.data?.message || error);
+      setLocalError(
+        getBackendFieldError(submitError, 'gender')
+        || submitError?.processedData?.gender
+        || submitError?.response?.data?.message
+        || error
+        || formatMessage(customMessages['profile.custom.gender.validation.required']),
+      );
     }
   };
 
@@ -105,21 +129,14 @@ const CustomGender = ({
                 <label className="edit-section-header" htmlFor={formId}>
                   {formatMessage(messages['profile.gender.gender'])}
                 </label>
-                <select
-                  data-hj-suppress
-                  className="d-inline-block form-control"
+                <CustomSearchDropdown
                   id={formId}
-                  name={formId}
+                  options={genderOptions}
                   value={draftGender}
-                  onChange={(event) => setDraftGender(event.target.value)}
-                >
-                  <option value="">&nbsp;</option>
-                  {CUSTOM_GENDER_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {formatMessage(getCustomGenderLabelMessage(option))}
-                    </option>
-                  ))}
-                </select>
+                  placeholder={formatMessage(customMessages['profile.custom.gender.placeholder'])}
+                  isInvalid={Boolean(localError || error)}
+                  onChange={setDraftGender}
+                />
                 {(localError || error) && (
                   <Form.Control.Feedback hasIcon={false}>
                     {localError || error}

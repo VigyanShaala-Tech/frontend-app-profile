@@ -119,7 +119,11 @@
 }
 
 .custom-search-dropdown__option:hover {
-  background: #f8fbff;
+  background: rgba(var(--primary-rgb), 0.12);
+}
+
+.custom-search-dropdown__option.is-selected:hover {
+  background: rgba(var(--primary-rgb), 0.18);
 }
 
 .custom-search-dropdown__option:disabled {

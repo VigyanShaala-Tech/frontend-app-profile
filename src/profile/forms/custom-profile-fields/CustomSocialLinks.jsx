@@ -71,10 +71,10 @@ const CustomSocialLinks = ({
   const platformInfo = platformDisplayInfo(formatMessage);
 
   useEffect(() => {
-    if (editMode !== 'editing' && activePlatform !== null) {
+    if (editMode !== 'editing' && activePlatform !== null && saveState !== 'error') {
       setActivePlatform(null);
     }
-  }, [editMode, activePlatform]);
+  }, [editMode, activePlatform, saveState]);
 
   const mergeWithDrafts = (newSocialLink) => {
     const knownPlatforms = ['twitter', 'facebook', 'linkedin'];
@@ -106,8 +106,8 @@ const CustomSocialLinks = ({
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    // Keep active platform open so API failure message can show immediately.
     submitHandler(formId);
-    setActivePlatform(null);
   };
 
   const handleClose = () => {
@@ -158,7 +158,16 @@ const CustomSocialLinks = ({
       return (
         <div className="w-100 overflowWrap-breakWord">
           <EditableItemHeader
-            content={socialLink}
+            content={(
+              <a
+                className="custom-social-link-value"
+                href={socialLink}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {socialLink}
+              </a>
+            )}
             showEditButton
             onClickEdit={() => handleOpen(platform)}
             showVisibility={visibilitySocialLinks !== null && isVisibilityEnabled}
@@ -204,8 +213,16 @@ const CustomSocialLinks = ({
                   <div key={platform} className="custom-social-links__item">
                     <PlatformHeading platform={platform} platformInfo={platformInfo} />
                     <EditableItemHeader
-                      content={socialLink}
-                      contentPrefix={`${platformInfo[platform].name}: `}
+                      content={(
+                        <a
+                          className="custom-social-link-value"
+                          href={socialLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {socialLink}
+                        </a>
+                      )}
                     />
                   </div>
                 ))}
