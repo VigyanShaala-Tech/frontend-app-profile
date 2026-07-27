@@ -16,7 +16,7 @@
 
 .avatar-selector-grid__item:hover:not(:disabled),
 .avatar-selector-grid__item:focus:not(:disabled) {
-  border-color: rgba(var(--primary-rgb), 0.6);
+  border-color: var(--primary);
   outline: none;
   transform: scale(1.04);
 }

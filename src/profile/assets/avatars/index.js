@@ -9,12 +9,19 @@ import woman3 from './WoMan-3.png';
 // drop the image in this folder and add one entry below — nothing else
 // needs to change.
 const avatars = [
-  { id: 'man-1', src: man1 },
-  { id: 'man-2', src: man2 },
-  { id: 'man-3', src: man3 },
-  { id: 'woman-1', src: woman1 },
-  { id: 'woman-2', src: woman2 },
-  { id: 'woman-3', src: woman3 },
+  { id: 'man-1', src: man1, gender: 'm' },
+  { id: 'man-2', src: man2, gender: 'm' },
+  { id: 'man-3', src: man3, gender: 'm' },
+  { id: 'woman-1', src: woman1, gender: 'f' },
+  { id: 'woman-2', src: woman2, gender: 'f' },
+  { id: 'woman-3', src: woman3, gender: 'f' },
 ];
+
+export const getAvatarsForGender = (gender) => {
+  if (gender === 'm' || gender === 'f') {
+    return avatars.filter((avatar) => avatar.gender === gender);
+  }
+  return avatars;
+};
 
 export default avatars;

@@ -1,9 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { ModalDialog } from '@openedx/paragon';
 import { FormattedMessage, useIntl } from '@edx/frontend-platform/i18n';
 
-import avatars from '../assets/avatars';
+import { getAvatarsForGender } from '../assets/avatars';
 import messages from './AvatarSelectorModal.messages';
 import './custom-style/customAvatarSelector.scss';
 
@@ -31,10 +31,11 @@ const buildAvatarFormData = async (avatar) => {
   return formData;
 };
 
-const AvatarSelectorModal = ({ isOpen, onClose, onSelect }) => {
+const AvatarSelectorModal = ({ isOpen, onClose, onSelect, gender }) => {
   const intl = useIntl();
   const [pendingAvatarId, setPendingAvatarId] = useState(null);
   const [error, setError] = useState(null);
+  const filteredAvatars = useMemo(() => getAvatarsForGender(gender), [gender]);
 
   const handleSelect = useCallback(async (avatar) => {
     setError(null);
@@ -72,7 +73,7 @@ const AvatarSelectorModal = ({ isOpen, onClose, onSelect }) => {
         {error && <p className="small text-danger mb-3">{error}</p>}
 
         <div className="avatar-selector-grid">
-          {avatars.map((avatar, index) => (
+          {filteredAvatars.map((avatar, index) => (
             <button
               key={avatar.id}
               type="button"
@@ -100,6 +101,11 @@ AvatarSelectorModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onSelect: PropTypes.func.isRequired,
+  gender: PropTypes.string,
+};
+
+AvatarSelectorModal.defaultProps = {
+  gender: null,
 };
 
 export default AvatarSelectorModal;
