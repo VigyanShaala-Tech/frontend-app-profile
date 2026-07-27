@@ -21,6 +21,7 @@ const ProfileAvatar = ({
   onDelete,
   savePhotoState,
   isEditable,
+  gender,
 }) => {
   const intl = useIntl();
   const fileInput = useRef(null);
@@ -163,6 +164,7 @@ const ProfileAvatar = ({
           isOpen={isAvatarSelectorOpen}
           onClose={() => setIsAvatarSelectorOpen(false)}
           onSelect={onSave}
+          gender={gender}
         />
       )}
     </div>
@@ -176,6 +178,7 @@ ProfileAvatar.propTypes = {
   onDelete: PropTypes.func.isRequired,
   savePhotoState: PropTypes.oneOf([null, 'pending', 'complete', 'error']),
   isEditable: PropTypes.bool,
+  gender: PropTypes.string,
 };
 
 ProfileAvatar.defaultProps = {
@@ -183,6 +186,7 @@ ProfileAvatar.defaultProps = {
   isDefault: true,
   savePhotoState: null,
   isEditable: false,
+  gender: null,
 };
 
 export default ProfileAvatar;
