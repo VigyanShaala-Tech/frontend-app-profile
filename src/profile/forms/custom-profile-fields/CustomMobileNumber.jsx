@@ -321,7 +321,7 @@ const CustomMobileNumber = ({
                   </Form.Control.Feedback>
                 )}
               </Form.Group>
-              <div className="d-flex justify-content-end">
+              <div className="d-flex justify-content-start">
                 <Button variant="outline-primary" onClick={handleClose} className="mr-2">
                   {formatMessage(formControlMessages['profile.formcontrols.button.cancel'])}
                 </Button>

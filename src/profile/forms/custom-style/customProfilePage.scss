@@ -26,7 +26,6 @@
   display: flex;
   gap: 1.5rem;
   margin-bottom: 2rem;
-  padding: 0;
 }
 
 .custom-profile-header-avatar {
@@ -182,7 +181,8 @@
 .custom-profile-certificates-section {
   margin: 0 auto;
   max-width: 1400px;
-  padding: 24px 0 32px;
+  padding-top: 24px;
+  padding-bottom: 32px;
 }
 
 .custom-profile-certificate-title {
@@ -222,6 +222,16 @@
   justify-content: flex-end;
   margin-left: 16px;
   white-space: nowrap;
+}
+
+.custom-certificate-row__action .btn {
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+.custom-certificate-row__action .btn:hover,
+.custom-certificate-row__action .btn:focus {
+  transform: scale(1.02);
 }
 
 /* Custom-page only: convert icon-only edit action into text button */
@@ -336,7 +346,7 @@
 
 .custom-profile-layout .custom-profile-card .small.text-muted {
   align-items: center;
-  color: #64748b !important;
+  color: var(--primary) !important;
   display: inline-flex;
   font-size: 13px;
   gap: 6px;
@@ -344,7 +354,7 @@
 }
 
 .custom-profile-layout .custom-profile-card .small.text-muted svg {
-  color: #64748b;
+  color: var(--primary);
   height: 14px;
   width: 14px;
 }
@@ -357,12 +367,6 @@
 }
 
 @media (max-width: 1023px) {
-  .custom-profile-main,
-  .custom-profile-layout {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
   .custom-profile-content-grid {
     grid-template-columns: 1fr;
     gap: 16px;
@@ -373,7 +377,8 @@
   }
 
   .custom-profile-certificates-section {
-    padding: 20px 14px 28px;
+    padding-top: 20px;
+    padding-bottom: 28px;
   }
 
   .custom-certificate-row {
@@ -399,8 +404,6 @@
 
   .custom-profile-main {
     margin-top: -56px;
-    padding-left: 12px;
-    padding-right: 12px;
   }
 
   .custom-profile-header-card {
@@ -418,11 +421,6 @@
   .custom-profile-header-avatar .profile-avatar svg {
     height: 4rem;
     width: 4rem;
-  }
-
-  .custom-profile-layout {
-    padding-left: 12px;
-    padding-right: 12px;
   }
 
   .custom-profile-card {
@@ -468,6 +466,7 @@
   }
 
   .custom-profile-certificates-section {
-    padding: 18px 12px 24px;
+    padding-top: 18px;
+    padding-bottom: 24px;
   }
 }

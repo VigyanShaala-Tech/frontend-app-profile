@@ -16,6 +16,11 @@ const messages = defineMessages({
     defaultMessage: 'Add gender',
     description: 'Empty state CTA for custom gender field',
   },
+  'profile.custom.gender.placeholder': {
+    id: 'profile.custom.gender.placeholder',
+    defaultMessage: 'Select gender',
+    description: 'Placeholder for custom gender searchable dropdown',
+  },
 });
 
 export default messages;

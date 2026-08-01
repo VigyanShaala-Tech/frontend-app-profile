@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   Dropdown,
@@ -11,6 +11,7 @@ import { FormattedMessage, useIntl } from '@edx/frontend-platform/i18n';
 
 import { PhotoCamera } from '@openedx/paragon/icons';
 import { ReactComponent as DefaultAvatar } from '../assets/avatar.svg';
+import AvatarSelectorModal from './AvatarSelectorModal';
 import messages from './ProfileAvatar.messages';
 
 const ProfileAvatar = ({
@@ -20,13 +21,19 @@ const ProfileAvatar = ({
   onDelete,
   savePhotoState,
   isEditable,
+  gender,
 }) => {
   const intl = useIntl();
   const fileInput = useRef(null);
   const form = useRef(null);
+  const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
 
   const onClickUpload = () => {
     fileInput.current.click();
+  };
+
+  const onClickSelectAvatar = () => {
+    setIsAvatarSelectorOpen(true);
   };
 
   const onClickDelete = () => {
@@ -97,6 +104,11 @@ const ProfileAvatar = ({
                 description="Upload photo button"
               />
             </Dropdown.Item>
+            {isDefault && (
+              <Dropdown.Item type="button" onClick={onClickSelectAvatar}>
+                <FormattedMessage {...messages['profile.profileavatar.select-avatar-button']} />
+              </Dropdown.Item>
+            )}
             {!isDefault && (
               <Dropdown.Item type="button" onClick={onClickDelete}>
                 <FormattedMessage
@@ -147,6 +159,14 @@ const ProfileAvatar = ({
           accept=".jpg, .jpeg, .png"
         />
       </form>
+      {isAvatarSelectorOpen && (
+        <AvatarSelectorModal
+          isOpen={isAvatarSelectorOpen}
+          onClose={() => setIsAvatarSelectorOpen(false)}
+          onSelect={onSave}
+          gender={gender}
+        />
+      )}
     </div>
   );
 };
@@ -158,6 +178,7 @@ ProfileAvatar.propTypes = {
   onDelete: PropTypes.func.isRequired,
   savePhotoState: PropTypes.oneOf([null, 'pending', 'complete', 'error']),
   isEditable: PropTypes.bool,
+  gender: PropTypes.string,
 };
 
 ProfileAvatar.defaultProps = {
@@ -165,6 +186,7 @@ ProfileAvatar.defaultProps = {
   isDefault: true,
   savePhotoState: null,
   isEditable: false,
+  gender: null,
 };
 
 export default ProfileAvatar;

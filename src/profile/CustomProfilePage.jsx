@@ -163,6 +163,7 @@ const ProfilePage = ({ params }) => {
                   onDelete={handleDeleteProfilePhoto}
                   savePhotoState={savePhotoState}
                   isEditable={isAuthenticatedUserProfile()}
+                  gender={gender}
                 />
               </div>
               <div className="custom-profile-header-text">

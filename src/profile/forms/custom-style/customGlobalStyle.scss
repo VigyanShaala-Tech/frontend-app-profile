@@ -8,6 +8,39 @@
   --pgn-elevation-form-input-focus: 0 0 0 0.2rem rgba(105, 171, 74, 0.25);
 }
 
+.custom-profile-root > .custom-profile-main,
+.custom-profile-root > .custom-profile-layout,
+.custom-profile-root > .custom-extended-wrapper,
+.custom-profile-root > .custom-profile-certificates-section {
+  max-width: 1400px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 32px;
+  padding-right: 32px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 991px) {
+  .custom-profile-root > .custom-profile-main,
+  .custom-profile-root > .custom-profile-layout,
+  .custom-profile-root > .custom-extended-wrapper,
+  .custom-profile-root > .custom-profile-certificates-section {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .custom-profile-root > .custom-profile-main,
+  .custom-profile-root > .custom-profile-layout,
+  .custom-profile-root > .custom-extended-wrapper,
+  .custom-profile-root > .custom-profile-certificates-section {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 .custom-profile-root .text-primary,
 .custom-profile-root .text-primary-500 {
   color: var(--primary) !important;
@@ -73,5 +106,28 @@
 
 .custom-profile-btn-outline {
   border: 1px solid #d1d5db !important;
+  color: var(--primary) !important;
+}
+
+/* Custom-page only: convert default blue links to brand primary */
+.custom-profile-root .custom-profile-card a:not(.btn),
+.custom-profile-root .custom-profile-certificates-section a:not(.btn),
+.custom-profile-root .custom-social-links__item a:not(.btn) {
+  color: var(--primary) !important;
+}
+
+.custom-profile-root .custom-profile-card a:not(.btn):hover,
+.custom-profile-root .custom-profile-card a:not(.btn):focus,
+.custom-profile-root .custom-profile-certificates-section a:not(.btn):hover,
+.custom-profile-root .custom-profile-certificates-section a:not(.btn):focus,
+.custom-profile-root .custom-social-links__item a:not(.btn):hover,
+.custom-profile-root .custom-social-links__item a:not(.btn):focus {
+  color: var(--primary-dark) !important;
+}
+
+/* Social link values and visibility labels on custom page */
+.custom-profile-root .custom-profile-card .custom-social-links__item .edit-section-header,
+.custom-profile-root .custom-profile-card .small.text-muted,
+.custom-profile-root .custom-profile-card .small.text-muted svg {
   color: var(--primary) !important;
 }

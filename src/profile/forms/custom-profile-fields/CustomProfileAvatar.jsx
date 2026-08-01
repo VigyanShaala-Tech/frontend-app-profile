@@ -10,6 +10,7 @@ const CustomProfileAvatar = ({
   onDelete,
   savePhotoState,
   isEditable,
+  gender,
 }) => (
   <ProfileAvatar
     src={src}
@@ -18,6 +19,7 @@ const CustomProfileAvatar = ({
     onDelete={onDelete}
     savePhotoState={savePhotoState}
     isEditable={isEditable}
+    gender={gender}
   />
 );
 
@@ -28,6 +30,7 @@ CustomProfileAvatar.propTypes = {
   onDelete: PropTypes.func.isRequired,
   savePhotoState: PropTypes.oneOf([null, 'pending', 'complete', 'error']),
   isEditable: PropTypes.bool,
+  gender: PropTypes.string,
 };
 
 CustomProfileAvatar.defaultProps = {
@@ -35,6 +38,7 @@ CustomProfileAvatar.defaultProps = {
   isDefault: true,
   savePhotoState: null,
   isEditable: false,
+  gender: null,
 };
 
 export default CustomProfileAvatar;

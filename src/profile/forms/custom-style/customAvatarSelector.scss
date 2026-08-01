@@ -1,0 +1,43 @@
+.avatar-selector-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+}
+
+.avatar-selector-grid__item {
+  background: none;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  cursor: pointer;
+  padding: 2px;
+  position: relative;
+  transition: border-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+.avatar-selector-grid__item:hover:not(:disabled),
+.avatar-selector-grid__item:focus:not(:disabled) {
+  border-color: var(--primary);
+  outline: none;
+  transform: scale(1.04);
+}
+
+.avatar-selector-grid__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.avatar-selector-grid__image {
+  aspect-ratio: 1 / 1;
+  border-radius: 9999px;
+  display: block;
+  object-fit: cover;
+  width: 100%;
+}
+
+.avatar-selector-grid__spinner {
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
