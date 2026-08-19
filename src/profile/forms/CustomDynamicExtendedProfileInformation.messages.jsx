@@ -91,6 +91,41 @@ const messages = defineMessages({
     defaultMessage: 'Selected: {fileName}',
     description: 'Text shown when file input has selected file.',
   },
+  'Extended.Profile.Information.file.change.label': {
+    id: 'extended.profile.information.file.change.label',
+    defaultMessage: 'Replace file',
+    description: 'Label for the file input used to replace an already-uploaded file field.',
+  },
+  'Extended.Profile.Information.file.uploading': {
+    id: 'extended.profile.information.file.uploading',
+    defaultMessage: 'Uploading...',
+    description: 'Status text shown while a replacement file is uploading.',
+  },
+  'Extended.Profile.Information.file.upload.success': {
+    id: 'extended.profile.information.file.upload.success',
+    defaultMessage: 'File uploaded successfully.',
+    description: 'Status text shown after a replacement file upload succeeds.',
+  },
+  'Extended.Profile.Information.file.upload.error': {
+    id: 'extended.profile.information.file.upload.error',
+    defaultMessage: 'Unable to upload this file. Please try again.',
+    description: 'Fallback status text shown after a replacement file upload fails.',
+  },
+  'Extended.Profile.Information.file.validation.too.large': {
+    id: 'extended.profile.information.file.validation.too.large',
+    defaultMessage: 'File is too large. Maximum size is {maxSizeMB} MB.',
+    description: 'Client-side validation message when a selected file exceeds the field\'s size limit.',
+  },
+  'Extended.Profile.Information.file.validation.invalid.type': {
+    id: 'extended.profile.information.file.validation.invalid.type',
+    defaultMessage: 'Unsupported file type. Allowed: {accept}.',
+    description: 'Client-side validation message when a selected file does not match the field\'s accepted types.',
+  },
+  'Extended.Profile.Information.file.no.file': {
+    id: 'extended.profile.information.file.no.file',
+    defaultMessage: 'No file uploaded',
+    description: 'Text shown for a file field with no uploaded file yet.',
+  },
 });
 
 export default messages;

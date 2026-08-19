@@ -88,6 +88,8 @@ const evaluateEligibilityRule = (operator, value, expected) => {
   }
 };
 
+const isDisplayOnlyField = (field) => field.type === 'file';
+
 const resolveOptionValue = (option) => {
   if (typeof option === 'string') {
     return option;
@@ -166,6 +168,7 @@ const GenericSection = ({ config }) => {
   const [statusMessage, setStatusMessage] = useState({ type: '', message: '' });
   // Options loaded dynamically via optionsApi when parent dropdown changes
   const [dynamicOptions, setDynamicOptions] = useState({});
+  const [fileUploadState, setFileUploadState] = useState({});
 
   const fields = useMemo(() => (Array.isArray(config.fields) ? config.fields : []), [config.fields]);
   const hasSavedData = Boolean(savedData) && Object.keys(savedData || {}).length > 0;
@@ -294,8 +297,7 @@ const GenericSection = ({ config }) => {
   const preparePayload = () => {
     const payload = {};
     fields.forEach((field) => {
-      // Skip read-only fields — the server enforces this too, but skip here to keep the payload clean
-      if (field.readOnly) {
+      if (field.readOnly || isDisplayOnlyField(field)) {
         return;
       }
       const fieldValue = formData[field.name];
@@ -309,8 +311,8 @@ const GenericSection = ({ config }) => {
   };
 
   const validateField = (field, value) => {
-    // Read-only fields are never validated (user cannot change them)
-    if (field.readOnly) {
+    // Read-only and display-only (file) fields are never validated (user cannot change them here)
+    if (field.readOnly || isDisplayOnlyField(field)) {
       return '';
     }
     if (!isFieldVisible(field)) {
@@ -411,11 +413,122 @@ const GenericSection = ({ config }) => {
     setIsEditing(false);
   };
 
-  const renderFieldValue = (field, value) => {
-    if (Array.isArray(value)) {
-      return value.join(', ') || formatMessage(messages['Extended.Profile.Information.empty.value']);
+  // Client-side mirror of the server-side checks in file_upload.save_profile_upload — purely
+  // for fast feedback; the server re-validates independently and is the actual authority.
+  const validateSelectedFile = (field, selectedFile) => {
+    const { validation } = field;
+    if (!validation) {
+      return '';
     }
-    return value || formatMessage(messages['Extended.Profile.Information.empty.value']);
+    if (validation.maxSizeMB && selectedFile.size > validation.maxSizeMB * 1024 * 1024) {
+      return formatMessage(
+        messages['Extended.Profile.Information.file.validation.too.large'],
+        { maxSizeMB: validation.maxSizeMB },
+      );
+    }
+    if (validation.accept) {
+      const acceptTokens = String(validation.accept)
+        .split(',')
+        .map((token) => token.trim().toLowerCase())
+        .filter(Boolean);
+      const fileName = (selectedFile.name || '').toLowerCase();
+      const fileType = (selectedFile.type || '').toLowerCase();
+      const matches = acceptTokens.some((token) => (
+        token.startsWith('.') ? fileName.endsWith(token) : token === fileType
+      ));
+      if (!matches) {
+        return formatMessage(
+          messages['Extended.Profile.Information.file.validation.invalid.type'],
+          { accept: validation.accept },
+        );
+      }
+    }
+    return '';
+  };
+
+  const uploadFile = async (field, selectedFile) => {
+    if (!selectedFile) {
+      return;
+    }
+    const validationError = validateSelectedFile(field, selectedFile);
+    if (validationError) {
+      setFileUploadState((previous) => ({
+        ...previous,
+        [field.name]: { status: 'error', message: validationError },
+      }));
+      return;
+    }
+
+    setFileUploadState((previous) => ({
+      ...previous,
+      [field.name]: { status: 'uploading', message: '' },
+    }));
+
+    try {
+      const { LMS_BASE_URL } = getConfig();
+      const client = getAuthenticatedHttpClient();
+      const payload = new FormData();
+      payload.append('file', selectedFile);
+      const { data } = await client.post(`${LMS_BASE_URL}${field.fileApi}`, payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setSavedData((previous) => ({
+        ...(previous || {}),
+        [field.name]: { fileName: data.fileName, fileSize: data.fileSize },
+      }));
+      setFileUploadState((previous) => ({
+        ...previous,
+        [field.name]: {
+          status: 'success',
+          message: getBackendMessage(data) || formatMessage(messages['Extended.Profile.Information.file.upload.success']),
+        },
+      }));
+      emitProfileEvent(PROFILE_EVENTS.PROGRESS_SHOULD_REFRESH);
+    } catch (error) {
+      setFileUploadState((previous) => ({
+        ...previous,
+        [field.name]: {
+          status: 'error',
+          message: getErrorMessage(error) || formatMessage(messages['Extended.Profile.Information.file.upload.error']),
+        },
+      }));
+    }
+  };
+
+  // Renders a file-type field's current value as a clickable link to the streaming download
+  // endpoint (GET fileApi), or an empty-state message when nothing has been uploaded.
+  const renderFileLink = (field, value) => {
+    const fileName = value && typeof value === 'object' ? value.fileName : '';
+    if (!fileName) {
+      return <p className="mb-0 text-dark">{formatMessage(messages['Extended.Profile.Information.file.no.file'])}</p>;
+    }
+    const { LMS_BASE_URL } = getConfig();
+    return (
+      <p className="mb-0">
+        <a href={`${LMS_BASE_URL}${field.fileApi}`} target="_blank" rel="noopener noreferrer">
+          {fileName}
+        </a>
+      </p>
+    );
+  };
+
+  const renderFieldValue = (field, value) => {
+    const emptyLabel = formatMessage(messages['Extended.Profile.Information.empty.value']);
+    // File fields store an upload-metadata object ({fileName, fileSize, uploadId, contentType}),
+    // never a display-ready primitive — show just the filename instead of the raw object.
+    if (field.type === 'file') {
+      return (value && typeof value === 'object' && value.fileName) || emptyLabel;
+    }
+    if (Array.isArray(value)) {
+      return value.join(', ') || emptyLabel;
+    }
+    // Defensive: no other field type is expected to hand us an object here, but never let one
+    // crash the render — React cannot render a plain object as a child.
+    if (value && typeof value === 'object') {
+      return emptyLabel;
+    }
+    return value || emptyLabel;
   };
 
   // Returns the display label for a field, appending * for required editable fields
@@ -430,6 +543,46 @@ const GenericSection = ({ config }) => {
   const renderField = (field) => {
     if (!isFieldVisible(field)) {
       return null;
+    }
+    if (field.type === 'file') {
+      const uploadState = fileUploadState[field.name] || {};
+      return (
+        <Form.Group controlId={field.name} className="mb-4">
+          <label htmlFor={field.name} className="d-block font-weight-bold small text-muted">
+            {fieldLabel(field)}
+          </label>
+          {field.helper && <p className="small text-muted mb-2">{field.helper}</p>}
+          {renderFileLink(field, savedData?.[field.name])}
+          {!field.readOnly && (
+            <>
+              <Form.Control
+                id={field.name}
+                type="file"
+                className="mt-2"
+                accept={field.validation?.accept}
+                aria-label={formatMessage(messages['Extended.Profile.Information.file.change.label'])}
+                disabled={uploadState.status === 'uploading'}
+                onChange={(event) => {
+                  const picked = event.target.files?.[0] || null;
+                  // Reset so choosing the same filename again still fires onChange next time
+                  // eslint-disable-next-line no-param-reassign
+                  event.target.value = '';
+                  uploadFile(field, picked);
+                }}
+              />
+              {uploadState.status === 'uploading' && (
+                <p className="small text-muted mt-1 mb-0">{formatMessage(messages['Extended.Profile.Information.file.uploading'])}</p>
+              )}
+              {uploadState.status === 'success' && (
+                <p className="small text-success mt-1 mb-0">{uploadState.message}</p>
+              )}
+              {uploadState.status === 'error' && (
+                <p className="small text-danger mt-1 mb-0">{uploadState.message}</p>
+              )}
+            </>
+          )}
+        </Form.Group>
+      );
     }
 
     const value = formData[field.name];
@@ -561,26 +714,6 @@ const GenericSection = ({ config }) => {
       );
     }
 
-    if (field.type === 'file') {
-      return (
-        <Form.Group controlId={field.name} className="mb-4" isInvalid={Boolean(error)}>
-          <label htmlFor={field.name} className="d-block">{fieldLabel(field)}</label>
-          {helper && <p className="small text-muted mb-2">{helper}</p>}
-          <Form.Control
-            type="file"
-            accept={field.accept}
-            onChange={(event) => updateFieldValue(field.name, event.target.files?.[0] || null, field)}
-          />
-          {value?.name && (
-            <p className="small text-muted mt-2 mb-0">
-              {formatMessage(messages['Extended.Profile.Information.selected.file'], { fileName: value.name })}
-            </p>
-          )}
-          {error && <Form.Control.Feedback type="invalid">{error}</Form.Control.Feedback>}
-        </Form.Group>
-      );
-    }
-
     const isNumber = field.type === 'number';
     const inputType = field.type === 'email' ? 'email' : (isNumber ? 'number' : field.type);
     return (
@@ -658,11 +791,11 @@ const GenericSection = ({ config }) => {
                 {fields.map((field) => (
                   <div key={field.name} className="col-6 mb-3">
                     <strong>{field.label.replace('*', '').trim()}</strong>
-                    <p className="mb-0">
-                      {Array.isArray(savedData?.[field.name])
-                        ? savedData[field.name].join(', ') || formatMessage(messages['Extended.Profile.Information.empty.value'])
-                        : savedData?.[field.name] || formatMessage(messages['Extended.Profile.Information.empty.value'])}
-                    </p>
+                    {field.type === 'file' ? (
+                      renderFileLink(field, savedData?.[field.name])
+                    ) : (
+                      <p className="mb-0">{renderFieldValue(field, savedData?.[field.name])}</p>
+                    )}
                   </div>
                 ))}
               </div>
